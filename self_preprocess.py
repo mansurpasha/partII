@@ -37,13 +37,12 @@ def process_conversations(path, n, destination="processed_self"):
             nples.append(nplets)
     if not os.path.exists(destination):
         os.makedirs(destination)
-    f = open(join(destination, "nples.txt"), "w")
-    #
+    f = open(join(destination, "cleaned_nples.txt"), "w")
     for tuple in nples:
         out = ""
         for i in range(len(tuple)-1):
-            out += tuple[i] + SEP
-        out += tuple[len(tuple)-1] + '\n'
+            out += preprocess_sentence(tuple[i]) + SEP
+        out += preprocess_sentence(tuple[len(tuple)-1]) + '\n'
         f.write(out)
     f.close
 
