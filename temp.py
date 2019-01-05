@@ -282,13 +282,17 @@ for epoch in range(EPOCHS):
 
         optimizer.apply_gradients(zip(gradients, variables))
 
-        if batch % 100 == 0:
+        if batch % 10000 == 0:
             print('Epoch {} Batch {} Loss {:.4f}'.format(epoch + 1,
                                                          batch,
                                                          batch_loss.numpy()))
+            checkpoint.save(file_prefix=checkpoint_prefix)
+            print("Saved at Epoch {} Batch {}".format(epoch + 1, batch))
+
     # saving (checkpoint) the model every 2 epochs
-    if (epoch + 1) % 2 == 0:
-        checkpoint.save(file_prefix=checkpoint_prefix)
+    #if (epoch + 1) % 1 == 0:
+        #checkpoint.save(file_prefix=checkpoint_prefix)
+        #print("Saved at epoch {0}".format(epoch))
 
     print('Epoch {} Loss {:.4f}'.format(epoch + 1,
                                         total_loss / N_BATCH))
