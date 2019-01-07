@@ -21,7 +21,7 @@ path_to_zip = tf.keras.utils.get_file(
     'spa-eng.zip', origin='http://download.tensorflow.org/data/spa-eng.zip',
     extract=True)
 
-path_to_file = "data/self_dialogue_corpus/processed/cleaned_nples.txt"
+path_to_file = "/home/map79/git/partII/data/self_dialogue_corpus/processed/cleaned_nples.txt"
 
 
 # Converts the unicode file to ascii
@@ -132,10 +132,10 @@ input_tensor_train, input_tensor_val, target_tensor_train, target_tensor_val = t
 len(input_tensor_train), len(target_tensor_train), len(input_tensor_val), len(target_tensor_val)
 
 BUFFER_SIZE = len(input_tensor_train)
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 N_BATCH = BUFFER_SIZE//BATCH_SIZE
-embedding_dim = 256
-units = 1024
+embedding_dim = 128
+units = 512
 vocab_inp_size = len(inp_lang.word2idx)
 vocab_tar_size = len(targ_lang.word2idx)
 
@@ -239,12 +239,12 @@ def loss_function(real, pred):
   loss_ = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=real, logits=pred) * mask
   return tf.reduce_mean(loss_)
 
-checkpoint_dir = './training_checkpoints'
+checkpoint_dir = '/home/map79/git/partII/training_checkpoints'
 checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
 checkpoint = tf.train.Checkpoint(optimizer=optimizer,
                                  encoder=encoder,
                                  decoder=decoder)
-EPOCHS = 10
+EPOCHS = 1
 
 for epoch in range(EPOCHS):
     start = time.time()
@@ -282,7 +282,7 @@ for epoch in range(EPOCHS):
 
         optimizer.apply_gradients(zip(gradients, variables))
 
-        if batch % 10000 == 0:
+        if batch % 75 == 0:
             print('Epoch {} Batch {} Loss {:.4f}'.format(epoch + 1,
                                                          batch,
                                                          batch_loss.numpy()))
@@ -290,9 +290,9 @@ for epoch in range(EPOCHS):
             print("Saved at Epoch {} Batch {}".format(epoch + 1, batch))
 
     # saving (checkpoint) the model every 2 epochs
-    #if (epoch + 1) % 1 == 0:
-        #checkpoint.save(file_prefix=checkpoint_prefix)
-        #print("Saved at epoch {0}".format(epoch))
+    if (epoch + 1) % 1 == 0:
+        checkpoint.save(file_prefix=checkpoint_prefix)
+        print("Saved at epoch {0}".format(epoch))
 
     print('Epoch {} Loss {:.4f}'.format(epoch + 1,
                                         total_loss / N_BATCH))
