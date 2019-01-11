@@ -132,7 +132,7 @@ input_tensor_train, input_tensor_val, target_tensor_train, target_tensor_val = t
 len(input_tensor_train), len(target_tensor_train), len(input_tensor_val), len(target_tensor_val)
 
 BUFFER_SIZE = len(input_tensor_train)
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 N_BATCH = BUFFER_SIZE//BATCH_SIZE
 embedding_dim = 128
 units = 512
@@ -244,7 +244,11 @@ checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
 checkpoint = tf.train.Checkpoint(optimizer=optimizer,
                                  encoder=encoder,
                                  decoder=decoder)
-EPOCHS = 1
+
+# restoring the latest checkpoint in checkpoint_dir
+checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
+
+EPOCHS = 3
 
 for epoch in range(EPOCHS):
     start = time.time()
@@ -282,21 +286,21 @@ for epoch in range(EPOCHS):
 
         optimizer.apply_gradients(zip(gradients, variables))
 
+'''
         if batch % 75 == 0:
             print('Epoch {} Batch {} Loss {:.4f}'.format(epoch + 1,
                                                          batch,
                                                          batch_loss.numpy()))
             checkpoint.save(file_prefix=checkpoint_prefix)
             print("Saved at Epoch {} Batch {}".format(epoch + 1, batch))
+'''
 
-    # saving (checkpoint) the model every 2 epochs
-    if (epoch + 1) % 1 == 0:
-        checkpoint.save(file_prefix=checkpoint_prefix)
-        print("Saved at epoch {0}".format(epoch))
+    # saving (checkpoint) the model every 1 epochs
+    checkpoint.save(file_prefix=checkpoint_prefix)
+    print("Saved at epoch {0}".format(epoch))
 
     print('Epoch {} Loss {:.4f}'.format(epoch + 1,
-                                        total_loss / N_BATCH))
-    print('Time taken for 1 epoch {} sec\n'.format(time.time() - start))
+                                        total_loss / N_BATCH)) print('Time taken for 1 epoch {} sec\n'.format(time.time() - start))
 
 
 def evaluate(sentence, encoder, decoder, inp_lang, targ_lang, max_length_inp, max_length_targ):
@@ -360,5 +364,3 @@ def translate(sentence, encoder, decoder, inp_lang, targ_lang, max_length_inp, m
     attention_plot = attention_plot[:len(result.split(' ')), :len(sentence.split(' '))]
     plot_attention(attention_plot, sentence.split(' '), result.split(' '))
 
-# restoring the latest checkpoint in checkpoint_dir
-checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
