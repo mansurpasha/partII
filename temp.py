@@ -132,7 +132,7 @@ input_tensor_train, input_tensor_val, target_tensor_train, target_tensor_val = t
 len(input_tensor_train), len(target_tensor_train), len(input_tensor_val), len(target_tensor_val)
 
 BUFFER_SIZE = len(input_tensor_train)
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 N_BATCH = BUFFER_SIZE//BATCH_SIZE
 embedding_dim = 128
 units = 512
@@ -248,7 +248,7 @@ checkpoint = tf.train.Checkpoint(optimizer=optimizer,
 # restoring the latest checkpoint in checkpoint_dir
 checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
 
-EPOCHS = 3
+EPOCHS = 2
 
 for epoch in range(EPOCHS):
     start = time.time()
@@ -286,21 +286,21 @@ for epoch in range(EPOCHS):
 
         optimizer.apply_gradients(zip(gradients, variables))
 
-'''
-        if batch % 75 == 0:
+        if batch % 100 == 0:
             print('Epoch {} Batch {} Loss {:.4f}'.format(epoch + 1,
                                                          batch,
                                                          batch_loss.numpy()))
             checkpoint.save(file_prefix=checkpoint_prefix)
             print("Saved at Epoch {} Batch {}".format(epoch + 1, batch))
-'''
+            print('Time taken for 100 batches {} sec\n'.format(time.time() - start))
 
     # saving (checkpoint) the model every 1 epochs
     checkpoint.save(file_prefix=checkpoint_prefix)
     print("Saved at epoch {0}".format(epoch))
 
     print('Epoch {} Loss {:.4f}'.format(epoch + 1,
-                                        total_loss / N_BATCH)) print('Time taken for 1 epoch {} sec\n'.format(time.time() - start))
+                                        total_loss / N_BATCH)) 
+    print('Time taken for 1 epoch {} sec\n'.format(time.time() - start))
 
 
 def evaluate(sentence, encoder, decoder, inp_lang, targ_lang, max_length_inp, max_length_targ):
