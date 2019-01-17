@@ -41,8 +41,8 @@ def process_conversations(path, n, destination="processed_self"):
     for tuple in nples:
         out = ""
         for i in range(len(tuple)-1):
-            out += preprocess_sentence(tuple[i]) + SEP
-        out += preprocess_sentence(tuple[len(tuple)-1]) + '\n'
+            out += tuple[i] + SEP
+        out += tuple[len(tuple)-1] + '\n'
         f.write(out)
     f.close
 
