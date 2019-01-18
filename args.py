@@ -12,5 +12,6 @@ def format_parser(parser):
     parser.register('type', 'bool', lambda v: v.lower == "true")
 
     # Hyperparameters regarding the neural network
-    parser.add_argument("--checkpoint_dir", type=str, default='', help="Location of checkpoint dir")
+    parser.add_argument("--checkpoint_dir", type=str, default='', help="Filepath to directory where checkpoints are stored")
     parser.add_argument("--train_file", type=str, default='', help="Filepath to training data")
+    parser.add_argument("--model_file", type=str, default=None, help="Filepath to saved model to continue training")
