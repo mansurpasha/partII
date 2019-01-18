@@ -1,3 +1,15 @@
+from sklearn.model_selection import train_test_split
+import tensorflow as tf
+import re
+import unicodedata
+import os
+import numpy as np
+
+from nltk.tokenize import word_tokenize
+
+
+
+
 # Download the file
 path_to_zip = tf.keras.utils.get_file(
     'spa-eng.zip', origin='http://download.tensorflow.org/data/spa-eng.zip',
@@ -13,6 +25,8 @@ def unicode_to_ascii(s):
 
 
 def preprocess_sentence(w):
+
+    '''
     w = unicode_to_ascii(w.lower().strip())
 
     # creating a space between a word and the punctuation following it
@@ -25,11 +39,8 @@ def preprocess_sentence(w):
     w = re.sub(r"[^a-zA-Z?.!,¿]+", " ", w)
 
     w = w.rstrip().strip()
-
-    # adding a start and an end token to the sentence
-    # so that the model know when to start and stop predicting.
-    w = '<start> ' + w + ' <end>'
-    return w
+    '''
+    return word_tokenize(w.lower())
 
 
 # 1. Remove the accents
@@ -38,7 +49,7 @@ def preprocess_sentence(w):
 def create_dataset(path, num_examples):
     lines = open(path, encoding='UTF-8').read().strip().split('\n')
 
-    word_pairs = [[preprocess_sentence(w) for w in l.split('\t')] for l in lines[:num_examples]]
+    word_pairs = [[preprocess_sentence(w) for w in l.split('$$--$$')] for l in lines[:num_examples]]
 
     return word_pairs
 
@@ -55,17 +66,26 @@ class LanguageIndex():
         self.create_index()
 
     def create_index(self):
-        for phrase in self.lang:
-            self.vocab.update(phrase.split(' '))
-
-        self.vocab = sorted(self.vocab)
+        words = []
+        for x in self.lang:
+            for y in x:
+                words.append(y)
+        words, counts = np.unique(words, return_counts=True)
+        counts_sorted = np.argsort(-counts)
+        words = words[counts_sorted[0:10000]]
 
         self.word2idx['<pad>'] = 0
-        for index, word in enumerate(self.vocab):
-            self.word2idx[word] = index + 1
+        self.word2idx['<start>'] = 1
+        self.word2idx['<end>'] = 2
+        self.word2idx['<unk>'] = 3
+
+        for index, word in enumerate(words):
+            self.word2idx[word] = index + 4
 
         for word, index in self.word2idx.items():
             self.idx2word[index] = word
+
+
 
 
 def max_length(tensor):
@@ -77,32 +97,50 @@ def load_dataset(path, num_examples):
     pairs = create_dataset(path, num_examples)
 
     # index language using the class defined above
-    inp_lang = LanguageIndex(sp for en, sp in pairs)
-    targ_lang = LanguageIndex(en for en, sp in pairs)
+    lang = [inp for inp, targ in pairs]
+    lang = lang + [targ for inp,targ in pairs]
+    lang = LanguageIndex(lang)
 
     # Vectorize the input and target languages
+    input_tensor = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in inp] for inp, targ in pairs]
+    decoder_input = [[lang.word2idx[s] for s in targ] for inp, targ in pairs]
+    decoder_output = decoder_input
 
-    # Spanish sentences
-    input_tensor = [[inp_lang.word2idx[s] for s in sp.split(' ')] for en, sp in pairs]
-
-    # English sentences
-    target_tensor = [[targ_lang.word2idx[s] for s in en.split(' ')] for en, sp in pairs]
+    # Add start and end of sentence markers to respective sentences, creating two sets for decoder input and output
+    for s in input_tensor:
+        s.append(lang.word2idx["<end>"])
+    for s in decoder_input:
+        s.insert(0,lang.word2idx["<start>"])
+    for s in decoder_output:
+        s.append(lang.word2idx["<end>"])
 
     # Calculate max_length of input and output tensor
     # Here, we'll set those to the longest sentence in the dataset
-    max_length_inp, max_length_tar = max_length(input_tensor), max_length(target_tensor)
+    max_seq_length = max(max_length(input_tensor), max_length(decoder_input))
 
     # Padding the input and output tensor to the maximum length
-    input_tensor = tf.keras.preprocessing.sequence.pad_sequences(input_tensor,
-                                                                 maxlen=max_length_inp,
+    encoder_input = tf.keras.preprocessing.sequence.pad_sequences(input_tensor,
+                                                                 maxlen=max_seq_length,
                                                                  padding='post')
 
-    target_tensor = tf.keras.preprocessing.sequence.pad_sequences(target_tensor,
-                                                                  maxlen=max_length_tar,
+    decoder_input = tf.keras.preprocessing.sequence.pad_sequences(decoder_input,
+                                                                  maxlen=max_seq_length,
                                                                   padding='post')
 
-    return input_tensor, target_tensor, inp_lang, targ_lang, max_length_inp, max_length_tar
+    decoder_output = tf.keras.preprocessing.sequence.pad_sequences(decoder_output,
+                                                                  maxlen=max_seq_length,
+                                                                  padding='post')
 
+    one_hot = [[np.zeros(len(lang.word2idx)) for x in y] for y in decoder_output]
+    one_hot = np.zeros((num_examples,max_seq_length,len(lang.word2idx)))
+    for i in range(len(decoder_output)):
+        for j in range(max_seq_length):
+            index = decoder_output[i][j]
+            one_hot[i][j][index] = 1
+
+    return encoder_input, decoder_input, one_hot, lang, max_seq_length
+
+'''
 # Try experimenting with the size of that dataset
 num_examples = 30000
 input_tensor, target_tensor, inp_lang, targ_lang, max_length_inp, max_length_targ = load_dataset(path_to_file, num_examples)
@@ -123,3 +161,5 @@ vocab_tar_size = len(targ_lang.word2idx)
 
 dataset = tf.data.Dataset.from_tensor_slices((input_tensor_train, target_tensor_train)).shuffle(BUFFER_SIZE)
 dataset = dataset.batch(BATCH_SIZE, drop_remainder=True)
+'''
+
