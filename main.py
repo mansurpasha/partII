@@ -153,3 +153,5 @@ model.fit([encoder_input_data, decoder_input_data], decoder_output_data,
           batch_size=BATCH_SIZE,
           epochs=EPOCHS,
           validation_split=0.2)
+
+model.save(parameters.checkpoint_dir)
