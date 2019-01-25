@@ -103,7 +103,7 @@ def load_dataset(path, num_examples):
 
     # Vectorize the input and target languages
     input_tensor = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in inp] for inp, targ in pairs]
-    decoder_input = [[lang.word2idx[s] for s in targ] for inp, targ in pairs]
+    decoder_input = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in targ] for inp, targ in pairs]
     decoder_output = decoder_input
 
     # Add start and end of sentence markers to respective sentences, creating two sets for decoder input and output
