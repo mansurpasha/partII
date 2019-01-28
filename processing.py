@@ -73,7 +73,7 @@ class LanguageIndex():
                     words[word] = words[word] + 1
                 else:
                     words[word] = 1
-        word_counts = sorted(words.items(), key=lambda kv: kv[1])
+        word_counts = sorted(words.items(), key=lambda kv: -kv[1])
         top_words = [x[0] for x in word_counts[0:10000]]
 
         self.word2idx['<pad>'] = 0
@@ -100,7 +100,7 @@ def load_dataset(path, num_examples):
 
     # index language using the class defined above
     lang = [inp for inp, targ in pairs]
-    lang = lang + [targ for inp,targ in pairs]
+    lang.append(pairs[-1][1])
     lang = LanguageIndex(lang)
 
     # Vectorize the input and target languages
@@ -164,4 +164,16 @@ vocab_tar_size = len(targ_lang.word2idx)
 dataset = tf.data.Dataset.from_tensor_slices((input_tensor_train, target_tensor_train)).shuffle(BUFFER_SIZE)
 dataset = dataset.batch(BATCH_SIZE, drop_remainder=True)
 '''
+def create_vocab(path, num_examples, path_to_vocab):
+    # creating cleaned input, output pairs
+    pairs = create_dataset(path, num_examples)
 
+    # index language using the class defined above
+    lang = [inp for inp, targ in pairs]
+    lang.append(pairs[-1][1])
+    lang = LanguageIndex(lang)
+
+    f = open(path_to_vocab, 'w')
+    for k in lang.word2idx:
+        f.write(k)
+    f.close()
