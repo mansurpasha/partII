@@ -37,7 +37,7 @@ print(path_to_file)
 #######DATA PREPROCESSING#######
 
 # Try experimenting with the size of that dataset
-num_examples = 1000
+num_examples = 324401
 input_tensor, target_tensor_in, target_tensor_out, language, max_length = processing.load_dataset(path_to_file, num_examples)
 
 # Creating training and validation sets using an 80-20 split
@@ -49,7 +49,7 @@ input_tensor, target_tensor_in, target_tensor_out, language, max_length = proces
 #BUFFER_SIZE = len(input_tensor_train)
 BATCH_SIZE = 64
 #N_BATCH = BUFFER_SIZE//BATCH_SIZE
-EPOCHS = 3
+EPOCHS = 10
 embedding_dim = 128
 units = 256
 vocab_size = len(language.word2idx)
@@ -57,8 +57,6 @@ vocab_size = len(language.word2idx)
 encoder_input_data = input_tensor
 decoder_input_data = target_tensor_in
 decoder_output_data = target_tensor_out
-
-print("here")
 
 #######TRAINING#######
 
