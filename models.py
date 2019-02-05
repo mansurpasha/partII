@@ -51,7 +51,7 @@ class Encoder(tf.keras.Model):
 
         #layers
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-        self.gru = gru(self.enc_units)
+        self.gru = Gru(self.enc_units)
 
     def call(self, x, hidden):
         x = self.embedding(x)

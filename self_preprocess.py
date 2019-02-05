@@ -8,6 +8,8 @@ from tqdm import tqdm
 # string separators used to write processed tuples to file. These separators
 # are picked up when using split() to read the files
 SEP = "$$--$$"
+# token to represent an empty turn of conversation at the start of a dialogue
+SOC_token = "<SOC>"
 
 current_fp = os.path.realpath(__file__)
 
@@ -16,6 +18,8 @@ current_fp = os.path.realpath(__file__)
 def conversation_to_nples(filename, n):
     f = open(filename, "r")
     turns = []
+    for i in range(n-1):
+        turns.append(SOC_token)
     for line in f:
         turns.append(line.strip('\n'))
 
@@ -37,7 +41,7 @@ def process_conversations(path, n, destination="processed_self"):
             nples.append(nplets)
     if not os.path.exists(destination):
         os.makedirs(destination)
-    f = open(join(destination, "cleaned_nples.txt"), "w")
+    f = open(join(destination, "2ples.txt"), "w")
     for tuple in nples:
         out = ""
         for i in range(len(tuple)-1):
@@ -70,5 +74,5 @@ def preprocess_sentence(w):
     return w
 
 process_conversations(join(curdir,"data/self_dialogue_corpus/dialogues"),
-                      2, join(curdir,"data/self_dialogue_corpus/processed"))
+                      3, join(curdir,"data/self_dialogue_corpus/processed"))
 
