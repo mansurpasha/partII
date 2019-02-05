@@ -25,21 +25,6 @@ def unicode_to_ascii(s):
 
 
 def preprocess_sentence(w):
-
-    '''
-    w = unicode_to_ascii(w.lower().strip())
-
-    # creating a space between a word and the punctuation following it
-    # eg: "he is a boy." => "he is a boy ."
-    # Reference:- https://stackoverflow.com/questions/3645931/python-padding-punctuation-with-white-spaces-keeping-punctuation
-    w = re.sub(r"([?.!,¿])", r" \1 ", w)
-    w = re.sub(r'[" "]+', " ", w)
-
-    # replacing everything with space except (a-z, A-Z, ".", "?", "!", ",")
-    w = re.sub(r"[^a-zA-Z?.!,¿]+", " ", w)
-
-    w = w.rstrip().strip()
-    '''
     return word_tokenize(w.lower())
 
 
@@ -70,8 +55,6 @@ class LanguageIndex():
             self.idx2word[index] = word
 
 
-
-
 def max_length(tensor):
     return max(len(t) for t in tensor)
 
@@ -81,7 +64,10 @@ def load_dataset(path, num_examples, path_to_vocab):
     pairs = create_dataset(path, num_examples)
 
     # index language using the class defined above
-    vocab = open(path_to_vocab, 'r').readlines().strip("\n")
+    vocab = [w.strip("\n") for w in open(path_to_vocab, 'r').readlines()]
+
+    print(vocab)
+
     lang = LanguageIndex(vocab)
 
     # Vectorize the input and target languages
@@ -123,28 +109,6 @@ def load_dataset(path, num_examples, path_to_vocab):
 
     return encoder_input, decoder_input, one_hot, lang, max_seq_length
 
-'''
-# Try experimenting with the size of that dataset
-num_examples = 30000
-input_tensor, target_tensor, inp_lang, targ_lang, max_length_inp, max_length_targ = load_dataset(path_to_file, num_examples)
-
-# Creating training and validation sets using an 80-20 split
-input_tensor_train, input_tensor_val, target_tensor_train, target_tensor_val = train_test_split(input_tensor, target_tensor, test_size=0.2)
-
-# Show length
-len(input_tensor_train), len(target_tensor_train), len(input_tensor_val), len(target_tensor_val)
-
-BUFFER_SIZE = len(input_tensor_train)
-BATCH_SIZE = 64
-N_BATCH = BUFFER_SIZE//BATCH_SIZE
-embedding_dim = 256
-units = 1024
-vocab_inp_size = len(inp_lang.word2idx)
-vocab_tar_size = len(targ_lang.word2idx)
-
-dataset = tf.data.Dataset.from_tensor_slices((input_tensor_train, target_tensor_train)).shuffle(BUFFER_SIZE)
-dataset = dataset.batch(BATCH_SIZE, drop_remainder=True)
-'''
 def create_vocab(path, num_examples, path_to_vocab):
     # creating cleaned input, output pairs
     pairs = create_dataset(path, num_examples)

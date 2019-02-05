@@ -1,6 +1,5 @@
 from __future__ import absolute_import, division, print_function
 
-# Import TensorFlow >= 1.10 and enable eager execution
 import tensorflow as tf
 
 tf.enable_eager_execution()
@@ -20,8 +19,6 @@ import models
 import args
 
 print(tf.__version__)
-
-
 
 parser = argparse.ArgumentParser()
 args.format_parser(parser)
@@ -60,9 +57,10 @@ decoder = models.Decoder(vocab_size, embedding_dim, units, BATCH_SIZE)
 optimizer = tf.train.AdamOptimizer()
 
 def loss_function(real, pred):
-  mask = 1 - np.equal(real, 0)
-  loss_ = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=real, logits=pred) * mask
-  return tf.reduce_mean(loss_)
+    # Mask out padding
+    mask = 1 - np.equal(real, 0)
+    loss_ = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=real, logits=pred) * mask
+    return tf.reduce_mean(loss_)
 
 checkpoint_dir = parameters.checkpoint_dir
 checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
@@ -128,7 +126,7 @@ for epoch in range(EPOCHS):
 
 
 def evaluate(sentence, encoder, decoder, lang, max_length):
-    attention_plot = np.zeros((max_length_targ, max_length_inp))
+    attention_plot = np.zeros((max_length, max_length))
 
     sentence = processing.preprocess_sentence(sentence)
 
