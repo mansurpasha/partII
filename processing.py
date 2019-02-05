@@ -57,33 +57,15 @@ def create_dataset(path, num_examples):
 # This class creates a word -> index mapping (e.g,. "dad" -> 5) and vice-versa
 # (e.g., 5 -> "dad") for each language,
 class LanguageIndex():
-    def __init__(self, lang):
-        self.lang = lang
+    def __init__(self, vocab):
         self.word2idx = {}
         self.idx2word = {}
-        self.vocab = set()
 
-        self.create_index()
+        self.set_index(vocab)
 
-    def create_index(self):
-        words = {}
-        for sentence in self.lang:
-            for word in sentence:
-                if (word in words.keys()):
-                    words[word] = words[word] + 1
-                else:
-                    words[word] = 1
-        word_counts = sorted(words.items(), key=lambda kv: -kv[1])
-        top_words = [x[0] for x in word_counts[0:10000]]
-
-        self.word2idx['<pad>'] = 0
-        self.word2idx['<start>'] = 1
-        self.word2idx['<end>'] = 2
-        self.word2idx['<unk>'] = 3
-
-        for index, word in enumerate(top_words):
-            self.word2idx[word] = index + 4
-
+    def set_index(self, vocab):
+        for (i, word) in enumerate(vocab):
+            self.word2idx[word] = i
         for word, index in self.word2idx.items():
             self.idx2word[index] = word
 
@@ -94,14 +76,13 @@ def max_length(tensor):
     return max(len(t) for t in tensor)
 
 
-def load_dataset(path, num_examples):
+def load_dataset(path, num_examples, path_to_vocab):
     # creating cleaned input, output pairs
     pairs = create_dataset(path, num_examples)
 
     # index language using the class defined above
-    lang = [inp for inp, targ in pairs]
-    lang.append(pairs[-1][1])
-    lang = LanguageIndex(lang)
+    vocab = open(path_to_vocab, 'r').readlines().strip("\n")
+    lang = LanguageIndex(vocab)
 
     # Vectorize the input and target languages
     input_tensor = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in inp] for inp, targ in pairs]
@@ -171,9 +152,31 @@ def create_vocab(path, num_examples, path_to_vocab):
     # index language using the class defined above
     lang = [inp for inp, targ in pairs]
     lang.append(pairs[-1][1])
-    lang = LanguageIndex(lang)
+
+    word2idx = {}
+    words = {}
+    for sentence in lang:
+        for word in sentence:
+            if (word in words.keys()):
+                words[word] = words[word] + 1
+            else:
+                words[word] = 1
+    word_counts = sorted(words.items(), key=lambda kv: -kv[1])
+    top_words = [x[0] for x in word_counts[0:10000]]
+
+    word2idx['<pad>'] = 0
+    word2idx['<start>'] = 1
+    word2idx['<end>'] = 2
+    word2idx['<unk>'] = 3
+
+    for index, word in enumerate(top_words):
+        word2idx[word] = index + 4
 
     f = open(path_to_vocab, 'w')
-    for k in lang.word2idx:
-        f.write(k)
+    for k in word2idx:
+        f.write(k + "\n")
     f.close()
+
+if __name__ == "__main__":
+    create_vocab("/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/data/self_dialogue_corpus/processed/nples.txt",
+             324401, "vocab_file")

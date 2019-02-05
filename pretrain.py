@@ -36,7 +36,7 @@ print(path_to_file)
 
 # Try experimenting with the size of that dataset
 num_examples = 324401
-input_tensor, target_tensor_in, target_tensor_out, language, max_length = processing.load_dataset(path_to_file, num_examples)
+input_tensor, target_tensor_in, target_tensor_out, language, max_length = processing.load_dataset(path_to_file, num_examples, parameters.vocab_file)
 
 # Creating training and validation sets using an 80-20 split
 input_tensor_train, input_tensor_val, target_tensor_in_train, target_tensor_in_val, target_tensor_out_train, target_tensor_out_val = train_test_split(input_tensor, target_tensor_in, target_tensor_out, test_size=0.2)

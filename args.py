@@ -15,5 +15,6 @@ def format_parser(parser):
     parser.add_argument("--checkpoint_dir", type=str, default='', help="Filepath to directory where checkpoints are stored")
     parser.add_argument("--train_file", type=str, default='', help="Filepath to training data")
     parser.add_argument("--model_file", type=str, default=None, help="Filepath to saved model to continue training")
+    parser.add_argument("--vocab_file", type=str, default=None, help="Filepath to precomputed vocab file")
     parser.add_argument("--encoder_file", type=str, default=None, help="Filepath to saved encoder model for inference")
     parser.add_argument("--decoder_file", type=str, default=None, help="Filepath to saved decoder model for inference")
