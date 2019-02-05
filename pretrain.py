@@ -33,13 +33,13 @@ print(path_to_file)
 
 # Try experimenting with the size of that dataset
 num_examples = 324401
-input_tensor, target_tensor_in, target_tensor_out, language, max_length = processing.load_dataset(path_to_file, num_examples, parameters.vocab_file)
+input_tensor, target_tensor_in, language, max_length = processing.load_dataset(path_to_file, num_examples, parameters.vocab_file)
 
 # Creating training and validation sets using an 80-20 split
-input_tensor_train, input_tensor_val, target_tensor_in_train, target_tensor_in_val, target_tensor_out_train, target_tensor_out_val = train_test_split(input_tensor, target_tensor_in, target_tensor_out, test_size=0.2)
+input_tensor_train, input_tensor_val, target_tensor_in_train, target_tensor_in_val = train_test_split(input_tensor, target_tensor_in, test_size=0.2)
 
 # Show length
-print(len(input_tensor_train), len(target_tensor_in_train), len(target_tensor_out_train), len(input_tensor_val), len(target_tensor_in_val), len(target_tensor_out_val))
+print(len(input_tensor_train), len(target_tensor_in_train), len(input_tensor_val), len(target_tensor_in_val))
 
 BUFFER_SIZE = len(input_tensor_train)
 BATCH_SIZE = 64
@@ -48,7 +48,7 @@ embedding_dim = 128
 units = 256
 vocab_size = len(language.word2idx)
 
-dataset = tf.data.Dataset.from_tensor_slices((input_tensor_train, target_tensor_in_train, target_tensor_out_train)).shuffle(BUFFER_SIZE)
+dataset = tf.data.Dataset.from_tensor_slices((input_tensor_train, target_tensor_in_train)).shuffle(BUFFER_SIZE)
 dataset = dataset.batch(BATCH_SIZE, drop_remainder=True)
 
 encoder = models.Encoder(vocab_size, embedding_dim, units, BATCH_SIZE)
@@ -67,6 +67,8 @@ checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
 checkpoint = tf.train.Checkpoint(optimizer=optimizer,
                                  encoder=encoder,
                                  decoder=decoder)
+checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
+
 EPOCHS = 10
 
 for epoch in range(EPOCHS):
@@ -75,7 +77,7 @@ for epoch in range(EPOCHS):
     hidden = encoder.initialize_hidden_state()
     total_loss = 0
 
-    for (batch, (inp, targ_in, targ_out)) in enumerate(dataset):
+    for (batch, (inp, targ)) in enumerate(dataset):
         loss = 0
 
         with tf.GradientTape() as tape:
@@ -83,8 +85,8 @@ for epoch in range(EPOCHS):
 
             dec_hidden = enc_hidden
 
-            #dec_input = tf.expand_dims([targ_lang.word2idx['<start>']] * BATCH_SIZE, 1)
-            '''
+            dec_input = tf.expand_dims([language.word2idx['<start>']] * BATCH_SIZE, 1)
+
             # Teacher forcing - feeding the target as the next input
             for t in range(1, targ.shape[1]):
                 # passing enc_output to the decoder
@@ -94,11 +96,8 @@ for epoch in range(EPOCHS):
 
                 # using teacher forcing
                 dec_input = tf.expand_dims(targ[:, t], 1)
-            '''
-            predictions, dec_hidden, _ = decoder(targ_in, dec_hidden, enc_output)
-            loss += loss_function(targ_out, predictions)
 
-        batch_loss = (loss / int(targ_in.shape[1]))
+        batch_loss = (loss / int(targ.shape[1]))
 
         total_loss += batch_loss
 
@@ -185,6 +184,3 @@ def translate(sentence, encoder, decoder, inp_lang, targ_lang, max_length_inp, m
 
     attention_plot = attention_plot[:len(result.split(' ')), :len(sentence.split(' '))]
     plot_attention(attention_plot, sentence.split(' '), result.split(' '))
-
-# restoring the latest checkpoint in checkpoint_dir
-checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))

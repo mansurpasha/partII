@@ -73,15 +73,12 @@ def load_dataset(path, num_examples, path_to_vocab):
     # Vectorize the input and target languages
     input_tensor = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in inp] for inp, targ in pairs]
     decoder_input = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in targ] for inp, targ in pairs]
-    decoder_output = decoder_input
 
     # Add start and end of sentence markers to respective sentences, creating two sets for decoder input and output
     for s in input_tensor:
         s.append(lang.word2idx["<end>"])
     for s in decoder_input:
         s.insert(0,lang.word2idx["<start>"])
-    for s in decoder_output:
-        s.append(lang.word2idx["<end>"])
 
     # Calculate max_length of input and output tensor
     # Here, we'll set those to the longest sentence in the dataset
@@ -92,22 +89,12 @@ def load_dataset(path, num_examples, path_to_vocab):
                                                                  maxlen=max_seq_length,
                                                                  padding='post')
 
+
     decoder_input = tf.keras.preprocessing.sequence.pad_sequences(decoder_input,
                                                                   maxlen=max_seq_length,
                                                                   padding='post')
 
-    decoder_output = tf.keras.preprocessing.sequence.pad_sequences(decoder_output,
-                                                                  maxlen=max_seq_length,
-                                                                  padding='post')
-
-    one_hot = [[np.zeros(len(lang.word2idx)) for x in y] for y in decoder_output]
-    one_hot = np.zeros((num_examples,max_seq_length,len(lang.word2idx)))
-    for i in range(len(decoder_output)):
-        for j in range(max_seq_length):
-            index = decoder_output[i][j]
-            one_hot[i][j][index] = 1
-
-    return encoder_input, decoder_input, one_hot, lang, max_seq_length
+    return encoder_input, decoder_input, lang, max_seq_length
 
 def create_vocab(path, num_examples, path_to_vocab):
     # creating cleaned input, output pairs
