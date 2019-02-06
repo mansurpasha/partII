@@ -32,20 +32,20 @@ print(path_to_file)
 #######DATA PREPROCESSING#######
 
 # Try experimenting with the size of that dataset
-num_examples = 324
+num_examples = parameters.num_examples
 input_tensor, target_tensor_in, language, max_length = processing.load_dataset(path_to_file, num_examples, parameters.vocab_file)
 
 # Creating training and validation sets using an 80-20 split
-input_tensor_train, input_tensor_val, target_tensor_in_train, target_tensor_in_val = train_test_split(input_tensor, target_tensor_in, test_size=0.2)
+input_tensor_train, input_tensor_val, target_tensor_in_train, target_tensor_in_val = train_test_split(input_tensor, target_tensor_in, test_size=parameters.test_size)
 
 # Show length
 print(len(input_tensor_train), len(target_tensor_in_train), len(input_tensor_val), len(target_tensor_in_val))
 
 BUFFER_SIZE = len(input_tensor_train)
-BATCH_SIZE = 64
+BATCH_SIZE = parameters.batch_size
 N_BATCH = BUFFER_SIZE//BATCH_SIZE
-embedding_dim = 128
-units = 256
+embedding_dim = parameters.embedding_dim
+units = parameters.units
 vocab_size = len(language.word2idx)
 
 dataset = tf.data.Dataset.from_tensor_slices((input_tensor_train, target_tensor_in_train)).shuffle(BUFFER_SIZE)
@@ -67,9 +67,11 @@ checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
 checkpoint = tf.train.Checkpoint(optimizer=optimizer,
                                  encoder=encoder,
                                  decoder=decoder)
-#checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
 
-EPOCHS = 10
+if parameters.continue_training:
+    checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
+
+EPOCHS = parameters.epochs
 
 for epoch in range(EPOCHS):
     start = time.time()
@@ -81,7 +83,7 @@ for epoch in range(EPOCHS):
         loss = 0
 
         with tf.GradientTape() as tape:
-            print(inp.shape, hidden.shape)
+            print(inp.shape, targ.shape)
             enc_output, enc_hidden = encoder(inp, hidden)
 
             dec_hidden = enc_hidden
@@ -112,8 +114,6 @@ for epoch in range(EPOCHS):
             print('Epoch {} Batch {} Loss {:.4f}'.format(epoch + 1,
                                                          batch,
                                                          batch_loss.numpy()))
-            checkpoint.save(file_prefix=checkpoint_prefix)
-            print("Saved at Epoch {} Batch {}".format(epoch + 1, batch))
 
     # saving (checkpoint) the model every 2 epochs
     if (epoch + 1) % 1 == 0:

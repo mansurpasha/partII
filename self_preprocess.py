@@ -9,7 +9,7 @@ from tqdm import tqdm
 # are picked up when using split() to read the files
 SEP = "$$--$$"
 # token to represent an empty turn of conversation at the start of a dialogue
-SOC_token = "<SOC>"
+SOC_token = "start_of_conversation_token"
 
 current_fp = os.path.realpath(__file__)
 
@@ -50,6 +50,14 @@ def process_conversations(path, n, destination="processed_self"):
         f.write(out)
     f.close
 
+def get_start_sentences(path, destination):
+    filenames = [f for f in listdir(path) if isfile(join(path, f))]
+    init_sentences = [open(join(path,filename)).readline() for filename in filenames]
+    f = open(join(destination, "init_sentences"), "w")
+    for sentence in init_sentences:
+        f.write(sentence)
+
+
 def unicode_to_ascii(s):
     return ''.join(c for c in unicodedata.normalize('NFD', s)
                    if unicodedata.category(c) != 'Mn')
@@ -73,6 +81,9 @@ def preprocess_sentence(w):
     w = '<start> ' + w + ' <end>'
     return w
 
-process_conversations(join(curdir,"data/self_dialogue_corpus/dialogues"),
+if __name__ == '__main__':
+    process_conversations(join(curdir,"data/self_dialogue_corpus/dialogues"),
                       3, join(curdir,"data/self_dialogue_corpus/processed"))
+    #get_start_sentences(join(curdir,"data/self_dialogue_corpus/dialogues"),
+                        #join(curdir,"data/self_dialogue_corpus/processed"))
 

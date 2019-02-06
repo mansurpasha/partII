@@ -61,21 +61,22 @@ def max_length(tensor):
 
 def load_dataset(path, num_examples, path_to_vocab):
     # creating cleaned input, output pairs
-    pairs = create_dataset(path, num_examples)
+    triples = create_dataset(path, num_examples)
 
     # index language using the class defined above
     vocab = [w.strip("\n") for w in open(path_to_vocab, 'r').readlines()]
 
-    print(vocab)
-
     lang = LanguageIndex(vocab)
 
     # Vectorize the input and target languages
-    input_tensor = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in inp] for inp, targ in pairs]
-    decoder_input = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in targ] for inp, targ in pairs]
+    input_tensor = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in inp1] for inp1, inp2, targ in triples]
+    input_tensor2 = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in inp2] for inp1, inp2, targ in triples]
+    decoder_input = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in targ] for inp1, inp2, targ in triples]
 
     # Add start and end of sentence markers to respective sentences, creating two sets for decoder input and output
     for s in input_tensor:
+        s.append(lang.word2idx["<end>"])
+    for s in input_tensor2:
         s.append(lang.word2idx["<end>"])
     for s in decoder_input:
         s.insert(0,lang.word2idx["<start>"])
@@ -89,10 +90,15 @@ def load_dataset(path, num_examples, path_to_vocab):
                                                                  maxlen=max_seq_length,
                                                                  padding='post')
 
+    encoder_input2 = tf.keras.preprocessing.sequence.pad_sequences(input_tensor2,
+                                                                 maxlen=max_seq_length,
+                                                                 padding='post')
 
     decoder_input = tf.keras.preprocessing.sequence.pad_sequences(decoder_input,
                                                                   maxlen=max_seq_length,
                                                                   padding='post')
+
+    encoder_input = [np.concatenate((x,y)) for x, y in zip(encoder_input, encoder_input2)]
 
     return encoder_input, decoder_input, lang, max_seq_length
 
