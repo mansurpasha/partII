@@ -32,7 +32,7 @@ print(path_to_file)
 #######DATA PREPROCESSING#######
 
 # Try experimenting with the size of that dataset
-num_examples = 324401
+num_examples = 324
 input_tensor, target_tensor_in, language, max_length = processing.load_dataset(path_to_file, num_examples, parameters.vocab_file)
 
 # Creating training and validation sets using an 80-20 split
@@ -52,7 +52,7 @@ dataset = tf.data.Dataset.from_tensor_slices((input_tensor_train, target_tensor_
 dataset = dataset.batch(BATCH_SIZE, drop_remainder=True)
 
 encoder = models.Encoder(vocab_size, embedding_dim, units, BATCH_SIZE)
-decoder = models.Decoder(vocab_size, embedding_dim, units, BATCH_SIZE)
+decoder = models.Decoder_attn(vocab_size, embedding_dim, units, BATCH_SIZE)
 
 optimizer = tf.train.AdamOptimizer()
 
@@ -67,7 +67,7 @@ checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
 checkpoint = tf.train.Checkpoint(optimizer=optimizer,
                                  encoder=encoder,
                                  decoder=decoder)
-checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
+#checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
 
 EPOCHS = 10
 
@@ -81,6 +81,7 @@ for epoch in range(EPOCHS):
         loss = 0
 
         with tf.GradientTape() as tape:
+            print(inp.shape, hidden.shape)
             enc_output, enc_hidden = encoder(inp, hidden)
 
             dec_hidden = enc_hidden

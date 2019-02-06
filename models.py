@@ -63,7 +63,7 @@ class Encoder(tf.keras.Model):
 
 class Decoder_attn(tf.keras.Model):
     def __init__(self, vocab_size, embedding_dim, dec_units, batch_sz):
-        super(Decoder, self).__init__()
+        super(Decoder_attn, self).__init__()
         self.batch_sz = batch_sz
         self.dec_units = dec_units
 
