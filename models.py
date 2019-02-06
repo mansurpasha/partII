@@ -69,7 +69,7 @@ class Decoder_attn(tf.keras.Model):
 
         #layers
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-        self.gru = gru(self.dec_units)
+        self.gru = Gru(self.dec_units)
         self.fc = tf.keras.layers.Dense(vocab_size)
 
         # used for attention
@@ -123,7 +123,7 @@ class Decoder(tf.keras.Model):
         self.dec_units = dec_units
 
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-        self.gru = gru(self.dec_units)
+        self.gru = Gru(self.dec_units)
         self.fc = tf.keras.layers.Dense(vocab_size)
 
         # used for attention
