@@ -68,8 +68,7 @@ checkpoint = tf.train.Checkpoint(optimizer=optimizer,
                                  encoder=encoder,
                                  decoder=decoder)
 
-if parameters.continue_training:
-    checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
+checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
 
 EPOCHS = parameters.epochs
 
@@ -83,7 +82,6 @@ for epoch in range(EPOCHS):
         loss = 0
 
         with tf.GradientTape() as tape:
-            print(inp.shape, targ.shape)
             enc_output, enc_hidden = encoder(inp, hidden)
 
             dec_hidden = enc_hidden
