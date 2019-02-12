@@ -13,6 +13,7 @@ import numpy as np
 import os
 import time
 import argparse
+import random
 
 import processing
 import models
@@ -68,61 +69,21 @@ checkpoint = tf.train.Checkpoint(optimizer=optimizer,
                                  encoder=encoder,
                                  decoder=decoder)
 
-if parameters.continue_training:
-    checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
+checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
 
 EPOCHS = parameters.epochs
 
-for epoch in range(EPOCHS):
-    start = time.time()
 
-    hidden = encoder.initialize_hidden_state()
-    total_loss = 0
-
-    for (batch, (inp, targ)) in enumerate(dataset):
-        loss = 0
-
-        with tf.GradientTape() as tape:
-            print(inp.shape, targ.shape)
-            enc_output, enc_hidden = encoder(inp, hidden)
-
-            dec_hidden = enc_hidden
-
-            dec_input = tf.expand_dims([language.word2idx['<start>']] * BATCH_SIZE, 1)
-
-            # Teacher forcing - feeding the target as the next input
-            for t in range(1, targ.shape[1]):
-                # passing enc_output to the decoder
-                predictions, dec_hidden, _ = decoder(dec_input, dec_hidden, enc_output)
-
-                loss += loss_function(targ[:, t], predictions)
-
-                # using teacher forcing
-                dec_input = tf.expand_dims(targ[:, t], 1)
-
-        batch_loss = (loss / int(targ.shape[1]))
-
-        total_loss += batch_loss
-
-        variables = encoder.variables + decoder.variables
-
-        gradients = tape.gradient(loss, variables)
-
-        optimizer.apply_gradients(zip(gradients, variables))
-
-        if batch % 75 == 0:
-            print('Epoch {} Batch {} Loss {:.4f}'.format(epoch + 1,
-                                                         batch,
-                                                         batch_loss.numpy()))
-
-    # saving (checkpoint) the model every 2 epochs
-    if (epoch + 1) % 1 == 0:
-        checkpoint.save(file_prefix=checkpoint_prefix)
-        print("Saved at epoch {0}".format(epoch))
-
-    print('Epoch {} Loss {:.4f}'.format(epoch + 1,
-                                        total_loss / N_BATCH))
-    print('Time taken for 1 epoch {} sec\n'.format(time.time() - start))
+def model_test():
+    print("Performance on training set:")
+    sentence = random.choice(input_tensor_train)
+    result, sentence, _ = evaluate(sentence, encoder, decoder, language, max_length)
+    print("In: {}   Out: {}".format(sentence, result))
+    print()
+    print("Performance on test set:")
+    sentence = random.choice(input_tensor_val)
+    result, sentence, _ = evaluate(sentence, encoder, decoder, language, max_length)
+    print("In: {}   Out: {}".format(sentence, result))
 
 
 def evaluate(sentence, encoder, decoder, lang, max_length):
@@ -176,12 +137,69 @@ def plot_attention(attention, sentence, predicted_sentence):
     plt.show()
 
 
-def translate(sentence, encoder, decoder, inp_lang, targ_lang, max_length_inp, max_length_targ):
-    result, sentence, attention_plot = evaluate(sentence, encoder, decoder, inp_lang, targ_lang, max_length_inp,
-                                                max_length_targ)
+def translate(sentence, encoder, decoder, lang, max_length):
+    result, sentence, attention_plot = evaluate(sentence, encoder, decoder, lang, max_length)
 
     print('Input: {}'.format(sentence))
     print('Predicted translation: {}'.format(result))
 
     attention_plot = attention_plot[:len(result.split(' ')), :len(sentence.split(' '))]
     plot_attention(attention_plot, sentence.split(' '), result.split(' '))
+
+for epoch in range(EPOCHS):
+    start = time.time()
+
+    hidden = encoder.initialize_hidden_state()
+    total_loss = 0
+
+    for (batch, (inp, targ)) in enumerate(dataset):
+        loss = 0
+
+        with tf.GradientTape() as tape:
+            print(inp.shape, targ.shape)
+            enc_output, enc_hidden = encoder(inp, hidden)
+
+            dec_hidden = enc_hidden
+
+            dec_input = tf.expand_dims([language.word2idx['<start>']] * BATCH_SIZE, 1)
+
+            # Teacher forcing - feeding the target as the next input
+            for t in range(1, targ.shape[1]):
+                # passing enc_output to the decoder
+                predictions, dec_hidden, _ = decoder(dec_input, dec_hidden, enc_output)
+
+                loss += loss_function(targ[:, t], predictions)
+
+                # using teacher forcing
+                dec_input = tf.expand_dims(targ[:, t], 1)
+
+        batch_loss = (loss / int(targ.shape[1]))
+
+        total_loss += batch_loss
+
+        variables = encoder.variables + decoder.variables
+
+        gradients = tape.gradient(loss, variables)
+
+        optimizer.apply_gradients(zip(gradients, variables))
+
+        if batch % 75 == 0:
+            print('Epoch {} Batch {} Loss {:.4f}'.format(epoch + 1,
+                                                         batch,
+                                                         batch_loss.numpy()))
+
+    # saving (checkpoint) the model every 2 epochs
+    if (epoch + 1) % 1 == 0:
+        checkpoint = tf.train.Checkpoint(optimizer=optimizer,
+                                         encoder=encoder,
+                                         decoder=decoder,
+                                         max_length=max_length)
+        checkpoint.save(file_prefix=checkpoint_prefix)
+        print("Saved at epoch {0}".format(epoch))
+        model_test()
+
+    print('Epoch {} Loss {:.4f}'.format(epoch + 1,
+                                        total_loss / N_BATCH))
+    print('Time taken for 1 epoch {} sec\n'.format(time.time() - start))
+
+

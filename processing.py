@@ -8,29 +8,9 @@ import numpy as np
 from nltk.tokenize import word_tokenize
 
 
-
-
-# Download the file
-path_to_zip = tf.keras.utils.get_file(
-    'spa-eng.zip', origin='http://download.tensorflow.org/data/spa-eng.zip',
-    extract=True)
-
-path_to_file = os.path.dirname(path_to_zip)+"/spa-eng/spa.txt"
-
-
-# Converts the unicode file to ascii
-def unicode_to_ascii(s):
-    return ''.join(c for c in unicodedata.normalize('NFD', s)
-                   if unicodedata.category(c) != 'Mn')
-
-
 def preprocess_sentence(w):
     return word_tokenize(w.lower())
 
-
-# 1. Remove the accents
-# 2. Clean the sentences
-# 3. Return word pairs in the format: [ENGLISH, SPANISH]
 def create_dataset(path, num_examples):
     lines = open(path, encoding='UTF-8').read().strip().split('\n')
 
@@ -38,9 +18,6 @@ def create_dataset(path, num_examples):
 
     return word_pairs
 
-
-# This class creates a word -> index mapping (e.g,. "dad" -> 5) and vice-versa
-# (e.g., 5 -> "dad") for each language,
 class LanguageIndex():
     def __init__(self, vocab):
         self.word2idx = {}
@@ -54,10 +31,15 @@ class LanguageIndex():
         for word, index in self.word2idx.items():
             self.idx2word[index] = word
 
-
 def max_length(tensor):
     return max(len(t) for t in tensor)
 
+def sentence_to_idx(sentence, lang, max_len):
+    indices = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in word_tokenize(sentence)]]
+    padded = tf.keras.preprocessing.sequence.pad_sequences(indices,
+                                                           maxlen=max_len,
+                                                           padding='post')
+    return padded
 
 def load_dataset(path, num_examples, path_to_vocab):
     # creating cleaned input, output pairs
