@@ -1,0 +1,5 @@
+model_checkpoint_path: "/home/map79/git/partII/training_checkpoints/ckpt-12"
+all_model_checkpoint_paths: "/home/map79/git/partII/training_checkpoints/ckpt-9"
+all_model_checkpoint_paths: "/home/map79/git/partII/training_checkpoints/ckpt-10"
+all_model_checkpoint_paths: "/home/map79/git/partII/training_checkpoints/ckpt-11"
+all_model_checkpoint_paths: "/home/map79/git/partII/training_checkpoints/ckpt-12"
