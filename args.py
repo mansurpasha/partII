@@ -8,14 +8,12 @@ import argparse
 
 def format_parser(parser):
     """Build the arguements parser"""
-    # Register the boolean type. This allows us to use booleans as arguments
-    parser.register('type', 'bool', lambda v: v.lower == "true")
 
     # Hyperparameters regarding the neural network
     parser.add_argument("--checkpoint_dir", type=str, default='', help="Filepath to directory where checkpoints are stored")
     parser.add_argument("--rl_dir", type=str, default='', help="Filepath to directory where policies are stored")
-    parser.add_argument("--initialize_rl", type=bool, default=False, help="If true, policy is initialized using newest seq2seq model")
-    parser.add_argument("--continue_training", type=bool, default=True, help="If false, initializes a brand new model for training")
+    parser.add_argument("--initialize_rl", type=str, default='n', help="If yes, policy is initialized using newest seq2seq model")
+    parser.add_argument("--continue_training", type=str, default='y', help="If no, initializes a brand new model for training")
     parser.add_argument("--train_file", type=str, default='', help="Filepath to training data")
     parser.add_argument("--model_file", type=str, default=None, help="Filepath to saved model to continue training")
     parser.add_argument("--vocab_file", type=str, default=None, help="Filepath to precomputed vocab file")

@@ -2,7 +2,7 @@
 <start>
 <end>
 <unk>
-<start_of_sentence>
+start_of_conversation_token
 .
 i
 the
