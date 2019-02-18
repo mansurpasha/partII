@@ -67,33 +67,19 @@ checkpoint_dir = parameters.checkpoint_dir
 checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
 checkpoint = tf.train.Checkpoint(optimizer=optimizer,
                                  encoder=encoder,
-                                 decoder=decoder)
+                                 decoder=decoder,
+                                 max_length=max_length)
 
-checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
+if parameters.continue_training == 'y':
+    checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
 
-EPOCHS = parameters.epochs
+EPOCHS = 1
 
-
-def model_test():
-    print("Performance on training set:")
-    sentence = random.choice(input_tensor_train)
-    result, sentence, _ = evaluate(sentence, encoder, decoder, language, max_length)
-    print("In: {}   Out: {}".format(sentence, result))
-    print()
-    print("Performance on test set:")
-    sentence = random.choice(input_tensor_val)
-    result, sentence, _ = evaluate(sentence, encoder, decoder, language, max_length)
-    print("In: {}   Out: {}".format(sentence, result))
-
-
+# accepts a tensor shape=(270,) of token indices and passes it through the model
+# output in string token form
 def evaluate(sentence, encoder, decoder, lang, max_length):
-    attention_plot = np.zeros((max_length, max_length))
-
-    sentence = processing.preprocess_sentence(sentence)
-
-    inputs = [lang.word2idx[i] for i in sentence.split(' ')]
-    inputs = tf.keras.preprocessing.sequence.pad_sequences([inputs], maxlen=max_length, padding='post')
-    inputs = tf.convert_to_tensor(inputs)
+    inputs = tf.convert_to_tensor(sentence)
+    inputs = tf.expand_dims(inputs, 0)
 
     result = ''
 
@@ -106,45 +92,35 @@ def evaluate(sentence, encoder, decoder, lang, max_length):
     for t in range(max_length):
         predictions, dec_hidden, attention_weights = decoder(dec_input, dec_hidden, enc_out)
 
-        # storing the attention weigths to plot later on
-        attention_weights = tf.reshape(attention_weights, (-1,))
-        attention_plot[t] = attention_weights.numpy()
-
         predicted_id = tf.multinomial(predictions, num_samples=1)[0][0].numpy()
 
         result += lang.idx2word[predicted_id] + ' '
 
         if lang.idx2word[predicted_id] == '<end>':
-            return result, sentence, attention_plot
+            return result, processing.idx_to_sentence(sentence, lang)
 
         # the predicted ID is fed back into the model
         dec_input = tf.expand_dims([predicted_id], 0)
 
-    return result, sentence, attention_plot
+    return result, processing.idx_to_sentence(sentence, lang)
 
+# accepts two strings representing consecutive turns of dialogue, and generates the models response to those turns
+# output in string token form
+def translate(sentence1, sentence2, encoder, decoder, lang, max_length):
+    inputs = processing.sentence_to_idx(sentence1, lang, max_length)
+    inputs = np.concatenate((inputs, processing.sentence_to_idx(sentence2, lang, max_length)), axis=None)
+    return evaluate(inputs, encoder, decoder, lang, max_length)
 
-# function for plotting the attention weights
-def plot_attention(attention, sentence, predicted_sentence):
-    fig = plt.figure(figsize=(10, 10))
-    ax = fig.add_subplot(1, 1, 1)
-    ax.matshow(attention, cmap='viridis')
-
-    fontdict = {'fontsize': 14}
-
-    ax.set_xticklabels([''] + sentence, fontdict=fontdict, rotation=90)
-    ax.set_yticklabels([''] + predicted_sentence, fontdict=fontdict)
-
-    plt.show()
-
-
-def translate(sentence, encoder, decoder, lang, max_length):
-    result, sentence, attention_plot = evaluate(sentence, encoder, decoder, lang, max_length)
-
-    print('Input: {}'.format(sentence))
-    print('Predicted translation: {}'.format(result))
-
-    attention_plot = attention_plot[:len(result.split(' ')), :len(sentence.split(' '))]
-    plot_attention(attention_plot, sentence.split(' '), result.split(' '))
+def model_test(encoder, decoder, language, max_length):
+    print("Performance on training set:")
+    sentence = random.choice(input_tensor_train)
+    result, sentence = evaluate(sentence, encoder, decoder, language, max_length)
+    print("In: {}   Out: {}".format(sentence, result))
+    print()
+    print("Performance on test set:")
+    sentence = random.choice(input_tensor_val)
+    result, sentence = evaluate(sentence, encoder, decoder, language, max_length)
+    print("In: {}   Out: {}".format(sentence, result))
 
 for epoch in range(EPOCHS):
     start = time.time()
@@ -196,7 +172,7 @@ for epoch in range(EPOCHS):
                                          max_length=max_length)
         checkpoint.save(file_prefix=checkpoint_prefix)
         print("Saved at epoch {0}".format(epoch))
-        model_test()
+        model_test(encoder, decoder, language, max_length)
 
     print('Epoch {} Loss {:.4f}'.format(epoch + 1,
                                         total_loss / N_BATCH))

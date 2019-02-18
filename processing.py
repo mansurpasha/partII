@@ -34,12 +34,23 @@ class LanguageIndex():
 def max_length(tensor):
     return max(len(t) for t in tensor)
 
+# accepts a string of any format, and returns its equivalent as a padded numpy array
+# output: numpy array of length max_len
 def sentence_to_idx(sentence, lang, max_len):
-    indices = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in word_tokenize(sentence)]]
-    padded = tf.keras.preprocessing.sequence.pad_sequences(indices,
+    indices = [lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in word_tokenize(sentence.lower())]
+    padded = tf.keras.preprocessing.sequence.pad_sequences([indices] ,
                                                            maxlen=max_len,
                                                            padding='post')
     return padded
+
+# accepts a (padded) array of index tokens and returns the string equivalent, filtering out any padding
+# output: string token format
+def idx_to_sentence(sentence, lang):
+    output = ""
+    for word in sentence:
+        if lang.idx2word[word] != "<pad>":
+            output += ' ' + lang.idx2word[word]
+    return output[1:]
 
 def load_dataset(path, num_examples, path_to_vocab):
     # creating cleaned input, output pairs
@@ -107,6 +118,7 @@ def create_vocab(path, num_examples, path_to_vocab):
     word2idx['<start>'] = 1
     word2idx['<end>'] = 2
     word2idx['<unk>'] = 3
+    word2idx['start_of_conversation_token']
 
     for index, word in enumerate(top_words):
         word2idx[word] = index + 4
