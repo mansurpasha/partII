@@ -69,7 +69,7 @@ def load_dataset(path, num_examples, path_to_vocab):
     for s in input_tensor:
         s.append(lang.word2idx["<end>"])
     for s in decoder_input:
-        s.insert(0,lang.word2idx["<start>"])
+        s.append(lang.word2idx["<end>"])
 
     # Calculate max_length of input and output tensor
     # Here, we'll set those to the longest sentence in the dataset
