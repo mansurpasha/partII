@@ -69,6 +69,10 @@ checkpoint = tf.train.Checkpoint(optimizer=optimizer,
                                  encoder=encoder,
                                  decoder=decoder)
 
+manager = tf.contrib.checkpoint.CheckpointManager(
+    checkpoint, directory=checkpoint_dir, max_to_keep=5)
+checkpoint.restore(manager.latest_checkpoint)
+
 if parameters.continue_training == 'y':
     checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
 
@@ -164,11 +168,8 @@ for epoch in range(EPOCHS):
 
     # saving (checkpoint) the model every 2 epochs
     if (epoch + 1) % 1 == 0:
-        checkpoint = tf.train.Checkpoint(optimizer=optimizer,
-                                         encoder=encoder,
-                                         decoder=decoder)
-        checkpoint.save(file_prefix=checkpoint_prefix)
-        print("Saved at epoch {0}".format(epoch))
+        manager.save()
+        print("Saved at epoch {0}".format(epoch + 1))
         model_test(encoder, decoder, language, max_length)
 
     print('Epoch {} Loss {:.4f}'.format(epoch + 1,
