@@ -17,31 +17,31 @@ import time
 
 print(tf.__version__)
 
-def process_decoder_input(target_data, target_vocab_to_int, batch_size):
+def process_decoder_input(target_data, language, params.batch_size):
     """
     Preprocess target data for encoding
     :return: Preprocessed target data
     """
     # get '<GO>' id
-    go_id = target_vocab_to_int['<GO>']
+    go_id = language.word2idx['<start>']
 
-    after_slice = tf.strided_slice(target_data, [0, 0], [batch_size, -1], [1, 1])
-    after_concat = tf.concat([tf.fill([batch_size, 1], go_id), after_slice], 1)
+    after_slice = tf.strided_slice(target_data, [0, 0], [params.batch_size, -1], [1, 1])
+    after_concat = tf.concat([tf.fill([params.batch_size, 1], go_id), after_slice], 1)
 
     return after_concat
 
-def encoding_layer(rnn_inputs, rnn_size, params.num_layers, params.keep_prob,
-                   source_vocab_size,
-                   encoding_embedding_size):
+def encoding_layer(rnn_inputs, params.units, params.num_layers, params.keep_prob,
+                   vocab_size,
+                   params.embedding_dim):
     """
     :return: tuple (RNN output, RNN state)
     """
     embed = tf.contrib.layers.embed_sequence(rnn_inputs,
-                                             vocab_size=source_vocab_size,
-                                             embed_dim=encoding_embedding_size)
+                                             vocab_size=vocab_size,
+                                             embed_dim=params.embedding_dim)
 
     stacked_cells = tf.contrib.rnn.MultiRNNCell(
-        [tf.contrib.rnn.DropoutWrapper(tf.contrib.rnn.LSTMCell(rnn_size), params.keep_prob) for _ in range(params.num_layers)])
+        [tf.contrib.rnn.DropoutWrapper(tf.contrib.rnn.LSTMCell(params.units), params.keep_prob) for _ in range(params.num_layers)])
 
     outputs, state = tf.nn.dynamic_rnn(stacked_cells,
                                        embed,
@@ -75,9 +75,8 @@ def decoding_layer_train(encoder_state, dec_cell, dec_embed_input,
     return outputs
 
 
-def decoding_layer_infer(encoder_state, dec_cell, dec_embeddings, start_of_sequence_id,
-                         end_of_sequence_id, max_target_sequence_length,
-                         vocab_size, output_layer, batch_size, params.keep_prob):
+def decoding_layer_infer(encoder_state, dec_cell, dec_embeddings, language, max_target_sequence_length,
+                         vocab_size, output_layer, params.batch_size, params.keep_prob):
     """
     Create a inference process in decoding layer
     :return: BasicDecoderOutput containing inference logits and sample_id
@@ -86,8 +85,8 @@ def decoding_layer_infer(encoder_state, dec_cell, dec_embeddings, start_of_seque
                                              output_keep_prob=params.keep_prob)
 
     helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(dec_embeddings,
-                                                      tf.fill([batch_size], start_of_sequence_id),
-                                                      end_of_sequence_id)
+                                                      tf.fill([params.batch_size], language.word2idx["<start>"]),
+                                                      language.word2idx["<end>"])
 
     decoder = tf.contrib.seq2seq.BasicDecoder(dec_cell,
                                               helper,
@@ -102,21 +101,21 @@ def decoding_layer_infer(encoder_state, dec_cell, dec_embeddings, start_of_seque
 
 def decoding_layer(dec_input, encoder_state,
                    target_sequence_length, max_target_sequence_length,
-                   rnn_size,
-                   params.num_layers, target_vocab_to_int, target_vocab_size,
-                   batch_size, params.keep_prob, decoding_embedding_size):
+                   params.units,
+                   params.num_layers, language, vocab_size,
+                   params.batch_size, params.keep_prob, decoding_embedding_size):
     """
     Create decoding layer
     :return: Tuple of (Training BasicDecoderOutput, Inference BasicDecoderOutput)
     """
-    target_vocab_size = len(target_vocab_to_int)
-    dec_embeddings = tf.Variable(tf.random_uniform([target_vocab_size, decoding_embedding_size]))
+    vocab_size = len(language.word2idx)
+    dec_embeddings = tf.Variable(tf.random_uniform([vocab_size, decoding_embedding_size]))
     dec_embed_input = tf.nn.embedding_lookup(dec_embeddings, dec_input)
 
-    cells = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.LSTMCell(rnn_size) for _ in range(params.num_layers)])
+    cells = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.LSTMCell(params.units) for _ in range(params.num_layers)])
 
     with tf.variable_scope("decode"):
-        output_layer = tf.layers.Dense(target_vocab_size)
+        output_layer = tf.layers.Dense(vocab_size)
         train_output = decoding_layer_train(encoder_state,
                                             cells,
                                             dec_embed_input,
@@ -129,48 +128,47 @@ def decoding_layer(dec_input, encoder_state,
         infer_output = decoding_layer_infer(encoder_state,
                                             cells,
                                             dec_embeddings,
-                                            target_vocab_to_int['<GO>'],
-                                            target_vocab_to_int['<EOS>'],
+                                            language,
                                             max_target_sequence_length,
-                                            target_vocab_size,
+                                            vocab_size,
                                             output_layer,
-                                            batch_size,
+                                            params.batch_size,
                                             params.keep_prob)
 
     return (train_output, infer_output)
 
 
-def seq2seq_model(input_data, target_data, params.keep_prob, batch_size,
+def seq2seq_model(input_data, target_data, params.keep_prob, params.batch_size,
                   target_sequence_length,
                   max_target_sentence_length,
-                  source_vocab_size, target_vocab_size,
-                  enc_embedding_size, dec_embedding_size,
-                  rnn_size, params.num_layers, target_vocab_to_int):
+                  vocab_size,
+                  params.embedding_dim, params.embedding_dim,
+                  params.units, params.num_layers, language):
     """
     Build the Sequence-to-Sequence model
     :return: Tuple of (Training BasicDecoderOutput, Inference BasicDecoderOutput)
     """
     enc_outputs, enc_states = encoding_layer(input_data,
-                                             rnn_size,
+                                             params.units,
                                              params.num_layers,
                                              params.keep_prob,
-                                             source_vocab_size,
-                                             enc_embedding_size)
+                                             vocab_size,
+                                             params.embedding_dim)
 
     dec_input = process_decoder_input(target_data,
-                                      target_vocab_to_int,
-                                      batch_size)
+                                      language,
+                                      params.batch_size)
 
     train_output, infer_output = decoding_layer(dec_input,
                                                 enc_states,
                                                 target_sequence_length,
                                                 max_target_sentence_length,
-                                                rnn_size,
+                                                params.units,
                                                 params.num_layers,
-                                                target_vocab_to_int,
-                                                target_vocab_size,
-                                                batch_size,
+                                                language,
+                                                vocab_size,
+                                                params.batch_size,
                                                 params.keep_prob,
-                                                dec_embedding_size)
+                                                params.embedding_dim)
 
     return train_output, infer_output
