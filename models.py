@@ -17,158 +17,160 @@ import time
 
 print(tf.__version__)
 
-def Gru(units):
-  if tf.test.is_gpu_available():
-    return tf.keras.layers.CuDNNGRU(units,
-                                    return_sequences=True,
-                                    return_state=True,
-                                    recurrent_initializer='glorot_uniform')
-  else:
-    return tf.keras.layers.GRU(units,
-                               return_sequences=True,
-                               return_state=True,
-                               recurrent_activation='sigmoid',
-                               recurrent_initializer='glorot_uniform')
+def process_decoder_input(target_data, target_vocab_to_int, batch_size):
+    """
+    Preprocess target data for encoding
+    :return: Preprocessed target data
+    """
+    # get '<GO>' id
+    go_id = target_vocab_to_int['<GO>']
 
-def Lstm(units):
-    if tf.test.is_gpu_available():
-        return tf.keras.layers.CuDNNLSTM(units,
-                                         return_sequences=True,
-                                         return_state=True,
-                                         recurrent_initializer='glorot_uniform')
-    else:
-        return tf.keras.layers.LSTM(units,
-                                    return_sequences=True,
-                                    return_state=True,
-                                    recurrent_activation='sigmoid',
-                                    recurrent_initializer='glorot_uniform')
+    after_slice = tf.strided_slice(target_data, [0, 0], [batch_size, -1], [1, 1])
+    after_concat = tf.concat([tf.fill([batch_size, 1], go_id), after_slice], 1)
 
-class Encoder(tf.keras.Model):
-    def __init__(self, vocab_size, embedding_dim, enc_units, batch_sz):
-        super(Encoder, self).__init__()
-        self.batch_sz = batch_sz
-        self.enc_units = enc_units
+    return after_concat
 
-        #layers
-        self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-        self.gru = Gru(self.enc_units)
+def encoding_layer(rnn_inputs, rnn_size, params.num_layers, params.keep_prob,
+                   source_vocab_size,
+                   encoding_embedding_size):
+    """
+    :return: tuple (RNN output, RNN state)
+    """
+    embed = tf.contrib.layers.embed_sequence(rnn_inputs,
+                                             vocab_size=source_vocab_size,
+                                             embed_dim=encoding_embedding_size)
 
-    def call(self, x, hidden):
-        x = self.embedding(x)
-        output, state = self.gru(x, initial_state=hidden)
-        return output, state
+    stacked_cells = tf.contrib.rnn.MultiRNNCell(
+        [tf.contrib.rnn.DropoutWrapper(tf.contrib.rnn.LSTMCell(rnn_size), params.keep_prob) for _ in range(params.num_layers)])
 
-    def initialize_hidden_state(self):
-        return tf.zeros((self.batch_sz, self.enc_units))
-
-class Decoder_attn(tf.keras.Model):
-    def __init__(self, vocab_size, embedding_dim, dec_units, batch_sz):
-        super(Decoder_attn, self).__init__()
-        self.batch_sz = batch_sz
-        self.dec_units = dec_units
-
-        #layers
-        self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-        self.gru = Gru(self.dec_units)
-        self.fc = tf.keras.layers.Dense(vocab_size)
-
-        # used for attention
-        self.W1 = tf.keras.layers.Dense(self.dec_units)
-        self.W2 = tf.keras.layers.Dense(self.dec_units)
-        self.V = tf.keras.layers.Dense(1)
-
-    def call(self, x, hidden, enc_output):
-        # enc_output shape == (batch_size, max_length, hidden_size)
-
-        # hidden shape == (batch_size, hidden size)
-        # hidden_with_time_axis shape == (batch_size, 1, hidden size)
-        # we are doing this to perform addition to calculate the score
-        hidden_with_time_axis = tf.expand_dims(hidden, 1)
-
-        # score shape == (batch_size, max_length, hidden_size)
-        score = tf.nn.tanh(self.W1(enc_output) + self.W2(hidden_with_time_axis))
-
-        # attention_weights shape == (batch_size, max_length, 1)
-        # we get 1 at the last axis because we are applying score to self.V
-        attention_weights = tf.nn.softmax(self.V(score), axis=1)
-
-        # context_vector shape after sum == (batch_size, hidden_size)
-        context_vector = attention_weights * enc_output
-        context_vector = tf.reduce_sum(context_vector, axis=1)
-
-        # x shape after passing through embedding == (batch_size, 1, embedding_dim)
-        x = self.embedding(x)
-
-        # x shape after concatenation == (batch_size, 1, embedding_dim + hidden_size)
-        x = tf.concat([tf.expand_dims(context_vector, 1), x], axis=-1)
-
-        # passing the concatenated vector to the GRU
-        output, state = self.gru(x)
-
-        # output shape == (batch_size * 1, hidden_size)
-        output = tf.reshape(output, (-1, output.shape[2]))
-
-        # output shape == (batch_size * 1, vocab)
-        x = self.fc(output)
-
-        return x, state, attention_weights
-
-    def initialize_hidden_state(self):
-        return tf.zeros((self.batch_sz, self.dec_units))
-
-class Decoder(tf.keras.Model):
-    def __init__(self, vocab_size, embedding_dim, dec_units, batch_sz):
-        super(Decoder, self).__init__()
-        self.batch_sz = batch_sz
-        self.dec_units = dec_units
-
-        self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-        self.gru = Gru(self.dec_units)
-        self.fc = tf.keras.layers.Dense(vocab_size)
-
-        # used for attention
-        #self.W1 = tf.keras.layers.Dense(self.dec_units)
-        #self.W2 = tf.keras.layers.Dense(self.dec_units)
-        #self.V = tf.keras.layers.Dense(1)
-
-    def call(self, x, hidden, enc_output):
-        # enc_output shape == (batch_size, max_length, hidden_size)
-
-        # hidden shape == (batch_size, hidden size)
-        # hidden_with_time_axis shape == (batch_size, 1, hidden size)
-        # we are doing this to perform addition to calculate the score
-        hidden_with_time_axis = tf.expand_dims(hidden, 1)
-
-        # score shape == (batch_size, max_length, hidden_size)
-        score = tf.nn.tanh(self.W1(enc_output) + self.W2(hidden_with_time_axis))
-
-        # attention_weights shape == (batch_size, max_length, 1)
-        # we get 1 at the last axis because we are applying score to self.V
-        attention_weights = tf.nn.softmax(self.V(score), axis=1)
-
-        # context_vector shape after sum == (batch_size, hidden_size)
-        context_vector = attention_weights * enc_output
-        context_vector = tf.reduce_sum(context_vector, axis=1)
-
-        # x shape after passing through embedding == (batch_size, 1, embedding_dim)
-        x = self.embedding(x)
-
-        # x shape after concatenation == (batch_size, 1, embedding_dim + hidden_size)
-        x = tf.concat([tf.expand_dims(context_vector, 1), x], axis=-1)
-
-        # passing the concatenated vector to the GRU
-        output, state = self.gru(x)
-
-        # output shape == (batch_size * 1, hidden_size)
-        output = tf.reshape(output, (-1, output.shape[2]))
-
-        # output shape == (batch_size * 1, vocab)
-        x = self.fc(output)
-
-        return x, state, attention_weights
-
-    def initialize_hidden_state(self):
-        return tf.zeros((self.batch_sz, self.dec_units))
+    outputs, state = tf.nn.dynamic_rnn(stacked_cells,
+                                       embed,
+                                       dtype=tf.float32)
+    return outputs, state
 
 
+def decoding_layer_train(encoder_state, dec_cell, dec_embed_input,
+                         target_sequence_length, max_summary_length,
+                         output_layer, params.keep_prob):
+    """
+    Create a training process in decoding layer
+    :return: BasicDecoderOutput containing training logits and sample_id
+    """
+    dec_cell = tf.contrib.rnn.DropoutWrapper(dec_cell,
+                                             output_keep_prob=params.keep_prob)
 
+    # for only input layer
+    helper = tf.contrib.seq2seq.TrainingHelper(dec_embed_input,
+                                               target_sequence_length)
+
+    decoder = tf.contrib.seq2seq.BasicDecoder(dec_cell,
+                                              helper,
+                                              encoder_state,
+                                              output_layer)
+
+    # unrolling the decoder layer
+    outputs, _, _ = tf.contrib.seq2seq.dynamic_decode(decoder,
+                                                      impute_finished=True,
+                                                      maximum_iterations=max_summary_length)
+    return outputs
+
+
+def decoding_layer_infer(encoder_state, dec_cell, dec_embeddings, start_of_sequence_id,
+                         end_of_sequence_id, max_target_sequence_length,
+                         vocab_size, output_layer, batch_size, params.keep_prob):
+    """
+    Create a inference process in decoding layer
+    :return: BasicDecoderOutput containing inference logits and sample_id
+    """
+    dec_cell = tf.contrib.rnn.DropoutWrapper(dec_cell,
+                                             output_keep_prob=params.keep_prob)
+
+    helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(dec_embeddings,
+                                                      tf.fill([batch_size], start_of_sequence_id),
+                                                      end_of_sequence_id)
+
+    decoder = tf.contrib.seq2seq.BasicDecoder(dec_cell,
+                                              helper,
+                                              encoder_state,
+                                              output_layer)
+
+    outputs, _, _ = tf.contrib.seq2seq.dynamic_decode(decoder,
+                                                      impute_finished=True,
+                                                      maximum_iterations=max_target_sequence_length)
+    return outputs
+
+
+def decoding_layer(dec_input, encoder_state,
+                   target_sequence_length, max_target_sequence_length,
+                   rnn_size,
+                   params.num_layers, target_vocab_to_int, target_vocab_size,
+                   batch_size, params.keep_prob, decoding_embedding_size):
+    """
+    Create decoding layer
+    :return: Tuple of (Training BasicDecoderOutput, Inference BasicDecoderOutput)
+    """
+    target_vocab_size = len(target_vocab_to_int)
+    dec_embeddings = tf.Variable(tf.random_uniform([target_vocab_size, decoding_embedding_size]))
+    dec_embed_input = tf.nn.embedding_lookup(dec_embeddings, dec_input)
+
+    cells = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.LSTMCell(rnn_size) for _ in range(params.num_layers)])
+
+    with tf.variable_scope("decode"):
+        output_layer = tf.layers.Dense(target_vocab_size)
+        train_output = decoding_layer_train(encoder_state,
+                                            cells,
+                                            dec_embed_input,
+                                            target_sequence_length,
+                                            max_target_sequence_length,
+                                            output_layer,
+                                            params.keep_prob)
+
+    with tf.variable_scope("decode", reuse=True):
+        infer_output = decoding_layer_infer(encoder_state,
+                                            cells,
+                                            dec_embeddings,
+                                            target_vocab_to_int['<GO>'],
+                                            target_vocab_to_int['<EOS>'],
+                                            max_target_sequence_length,
+                                            target_vocab_size,
+                                            output_layer,
+                                            batch_size,
+                                            params.keep_prob)
+
+    return (train_output, infer_output)
+
+
+def seq2seq_model(input_data, target_data, params.keep_prob, batch_size,
+                  target_sequence_length,
+                  max_target_sentence_length,
+                  source_vocab_size, target_vocab_size,
+                  enc_embedding_size, dec_embedding_size,
+                  rnn_size, params.num_layers, target_vocab_to_int):
+    """
+    Build the Sequence-to-Sequence model
+    :return: Tuple of (Training BasicDecoderOutput, Inference BasicDecoderOutput)
+    """
+    enc_outputs, enc_states = encoding_layer(input_data,
+                                             rnn_size,
+                                             params.num_layers,
+                                             params.keep_prob,
+                                             source_vocab_size,
+                                             enc_embedding_size)
+
+    dec_input = process_decoder_input(target_data,
+                                      target_vocab_to_int,
+                                      batch_size)
+
+    train_output, infer_output = decoding_layer(dec_input,
+                                                enc_states,
+                                                target_sequence_length,
+                                                max_target_sentence_length,
+                                                rnn_size,
+                                                params.num_layers,
+                                                target_vocab_to_int,
+                                                target_vocab_size,
+                                                batch_size,
+                                                params.keep_prob,
+                                                dec_embedding_size)
+
+    return train_output, infer_output

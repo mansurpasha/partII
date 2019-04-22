@@ -18,7 +18,9 @@ current_fp = os.path.realpath(__file__)
 def conversation_to_nples(filename, n):
     f = open(filename, "r")
     turns = []
-    for i in range(n-1):
+    # starts the conversations with markers indicating an empty turn, i.e. at the start of a conversation when the
+    # previous 2 turns are being considered
+    for i in range(n-2):
         turns.append(SOC_token)
     for line in f:
         turns.append(line.strip('\n'))

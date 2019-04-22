@@ -4,6 +4,7 @@ import re
 import unicodedata
 import os
 import numpy as np
+import pickle
 
 from nltk.tokenize import word_tokenize
 
@@ -12,12 +13,15 @@ def preprocess_sentence(w):
     return word_tokenize(w.lower())
 
 def create_dataset(path, num_examples):
+    # read datafile
     lines = open(path, encoding='UTF-8').read().strip().split('\n')
+    # split datafile into lines, splits lines into sentences using separator token $$--$$,
+    # and split sentences into lists of lowercase tokens
+    sentence_sets = [[preprocess_sentence(w) for w in l.split('$$--$$')] for l in lines]
 
-    word_pairs = [[preprocess_sentence(w) for w in l.split('$$--$$')] for l in lines[:num_examples]]
+    return sentence_sets
 
-    return word_pairs
-
+# class that stores information on converting words to tokens and vice versa
 class LanguageIndex():
     def __init__(self, vocab):
         self.word2idx = {}
@@ -52,7 +56,17 @@ def idx_to_sentence(sentence, lang):
             output += ' ' + lang.idx2word[word]
     return output[1:]
 
-def load_dataset(path, num_examples, path_to_vocab):
+# preprocess dataset into vectorized form
+# arguments:
+#   path - path to dataset
+#   num_examples - number of lines to read from dataset file
+#   path_to_vocab - path to precomputed vocab file
+#   model_type - determines what source and target vectors will be, string either "prev2", "forward", or "backward"
+#                prev2 - 2 turns of input, 1 turn of output
+#                forward - 1 turn of input, 1 turn of output
+#                backward - 1 turn of input, 1 turn of output, reversed source and target
+# IMPORTANT: forward and backward to be used with different dataset file, namely input-target pairs, instead of triples
+def load_dataset(path, num_examples, path_to_vocab, model_type):
     # creating cleaned input, output pairs
     triples = create_dataset(path, num_examples)
 
@@ -61,39 +75,33 @@ def load_dataset(path, num_examples, path_to_vocab):
 
     lang = LanguageIndex(vocab)
 
-    # Vectorize the input and target languages
-    input_tensor = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in inp1] for inp1, inp2, targ in triples]
-    input_tensor2 = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in inp2] for inp1, inp2, targ in triples]
-    decoder_input = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in targ] for inp1, inp2, targ in triples]
+    # vectorize input and target sentences, based on model being trained
+    # base model that considers previous 2 turns of dialogue
+    if model_type == "prev2":
+        input_tensor = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in inp1] for inp1, inp2, targ in triples]
+        input_tensor2 = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in inp2] for inp1, inp2, targ in triples]
+        input_tensor = [np.concatenate((x,y)) for x, y in zip(input_tensor, input_tensor2)]
+        decoder_input = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in targ] for inp1, inp2, targ in triples]
+    # model that considers 1 turn of dialogue
+    elif model_type == "forward":
+        input_tensor = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in inp1] for inp1, targ in triples]
+        decoder_input = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in targ] for inp1, targ in triples]
+    # model that reverses source and target sentences
+    elif model_type == "backward":
+        decoder_input = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in inp1] for inp1, targ in triples]
+        input_tensor = [[lang.word2idx[s] if (s in lang.word2idx) else lang.word2idx['<unk>'] for s in targ] for inp1, targ in triples]
+    else:
+        raise ValueError("correct model_type not found, use prev2, forward, or backward")
 
-    # Add start and end of sentence markers to respective sentences, creating two sets for decoder input and output
-    for s in input_tensor:
-        s.append(lang.word2idx["<end>"])
-    for s in input_tensor2:
-        s.append(lang.word2idx["<end>"])
+    # Add end of sentence markers to target_tensors. This signals when our decoder can stop generating a sequence
+    # Seperate decoder_input and decoder_target (input drops the end marker and has a start marker)
+    decoder_output = decoder_input.copy()
     for s in decoder_input:
+        s.insert(0, lang.word2idx["<start>"])
+    for s in decoder_output:
         s.append(lang.word2idx["<end>"])
 
-    # Calculate max_length of input and output tensor
-    # Here, we'll set those to the longest sentence in the dataset
-    max_seq_length = max(max_length(input_tensor), max_length(decoder_input))
-
-    # Padding the input and output tensor to the maximum length
-    encoder_input = tf.keras.preprocessing.sequence.pad_sequences(input_tensor,
-                                                                 maxlen=max_seq_length,
-                                                                 padding='post')
-
-    encoder_input2 = tf.keras.preprocessing.sequence.pad_sequences(input_tensor2,
-                                                                 maxlen=max_seq_length,
-                                                                 padding='post')
-
-    decoder_input = tf.keras.preprocessing.sequence.pad_sequences(decoder_input,
-                                                                  maxlen=max_seq_length,
-                                                                  padding='post')
-
-    encoder_input = [np.concatenate((x,y)) for x, y in zip(encoder_input, encoder_input2)]
-
-    return encoder_input, decoder_input, lang, max_seq_length
+    return input_tensor, decoder_input, decoder_output, lang
 
 def create_vocab(path, num_examples, path_to_vocab):
     # creating cleaned input, output pairs
@@ -118,7 +126,7 @@ def create_vocab(path, num_examples, path_to_vocab):
     word2idx['<start>'] = 1
     word2idx['<end>'] = 2
     word2idx['<unk>'] = 3
-    word2idx['start_of_conversation_token']
+    word2idx['start_of_conversation_token'] = 4
 
     for index, word in enumerate(top_words):
         word2idx[word] = index + 4
@@ -129,5 +137,26 @@ def create_vocab(path, num_examples, path_to_vocab):
     f.close()
 
 if __name__ == "__main__":
-    create_vocab("/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/data/self_dialogue_corpus/processed/nples.txt",
-             324401, "vocab_file")
+    # generate vocab file
+    '''create_vocab("/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/data/self_dialogue_corpus/processed/nples.txt",
+             324401, "vocab_file")'''
+    # pickle and store all preprocessed (vectorized) data and pickled vocab class
+    prev2_filepath = "/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/data/self_dialogue_corpus/processed/2ples.txt"
+    prev1_filepath = "/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/data/self_dialogue_corpus/processed/nples.txt"
+    vocab_file = "/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/vocab_file"
+
+    p2_encoder_input, p2_decoder_input, p2_decoder_output, _ = load_dataset(prev2_filepath, 324401, vocab_file, "prev2")
+    pickle.dump((p2_encoder_input, p2_decoder_input, p2_decoder_output), open('preprocess_prev2.p', 'wb'))
+    print("written p2")
+
+    f_encoder_input, f_decoder_input, f_decoder_output, _ = load_dataset(prev1_filepath, 324401, vocab_file, "forward")
+    pickle.dump((f_encoder_input, f_decoder_input, f_decoder_output), open('preprocess_forward.p', 'wb'))
+    print("written forward")
+
+    b_encoder_input, b_decoder_input, b_decoder_output, vocab = load_dataset(prev1_filepath, 324401, vocab_file, "backward")
+    pickle.dump((b_encoder_input, b_decoder_input, b_decoder_output), open('preprocess_backward.p', 'wb'))
+    print("written backward")
+
+    pickle.dump(vocab, open('vocab.p', 'wb'))
+    print("written vocab")
+
