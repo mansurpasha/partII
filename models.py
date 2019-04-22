@@ -17,7 +17,7 @@ import time
 
 print(tf.__version__)
 
-def process_decoder_input(target_data, language, params.batch_size):
+def process_decoder_input(target_data, language, params):
     """
     Preprocess target data for encoding
     :return: Preprocessed target data
@@ -30,9 +30,7 @@ def process_decoder_input(target_data, language, params.batch_size):
 
     return after_concat
 
-def encoding_layer(rnn_inputs, params.units, params.num_layers, params.keep_prob,
-                   vocab_size,
-                   params.embedding_dim):
+def encoding_layer(rnn_inputs, params, vocab_size):
     """
     :return: tuple (RNN output, RNN state)
     """
@@ -51,7 +49,7 @@ def encoding_layer(rnn_inputs, params.units, params.num_layers, params.keep_prob
 
 def decoding_layer_train(encoder_state, dec_cell, dec_embed_input,
                          target_sequence_length, max_summary_length,
-                         output_layer, params.keep_prob):
+                         output_layer, params):
     """
     Create a training process in decoding layer
     :return: BasicDecoderOutput containing training logits and sample_id
@@ -76,7 +74,7 @@ def decoding_layer_train(encoder_state, dec_cell, dec_embed_input,
 
 
 def decoding_layer_infer(encoder_state, dec_cell, dec_embeddings, language, max_target_sequence_length,
-                         vocab_size, output_layer, params.batch_size, params.keep_prob):
+                         vocab_size, output_layer, params):
     """
     Create a inference process in decoding layer
     :return: BasicDecoderOutput containing inference logits and sample_id
@@ -101,15 +99,13 @@ def decoding_layer_infer(encoder_state, dec_cell, dec_embeddings, language, max_
 
 def decoding_layer(dec_input, encoder_state,
                    target_sequence_length, max_target_sequence_length,
-                   params.units,
-                   params.num_layers, language, vocab_size,
-                   params.batch_size, params.keep_prob, decoding_embedding_size):
+                   params, language, vocab_size):
     """
     Create decoding layer
     :return: Tuple of (Training BasicDecoderOutput, Inference BasicDecoderOutput)
     """
     vocab_size = len(language.word2idx)
-    dec_embeddings = tf.Variable(tf.random_uniform([vocab_size, decoding_embedding_size]))
+    dec_embeddings = tf.Variable(tf.random_uniform([vocab_size, params.embedding_dim]))
     dec_embed_input = tf.nn.embedding_lookup(dec_embeddings, dec_input)
 
     cells = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.LSTMCell(params.units) for _ in range(params.num_layers)])
@@ -138,12 +134,11 @@ def decoding_layer(dec_input, encoder_state,
     return (train_output, infer_output)
 
 
-def seq2seq_model(input_data, target_data, params.keep_prob, params.batch_size,
+def seq2seq_model(input_data, target_data, params,
                   target_sequence_length,
                   max_target_sentence_length,
                   vocab_size,
-                  params.embedding_dim, params.embedding_dim,
-                  params.units, params.num_layers, language):
+                  language):
     """
     Build the Sequence-to-Sequence model
     :return: Tuple of (Training BasicDecoderOutput, Inference BasicDecoderOutput)
