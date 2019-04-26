@@ -46,11 +46,11 @@ def load_preprocess(datafile):
     with open(datafile, mode='rb') as in_file:
         return pickle.load(in_file)
 
-save_path = 'checkpoints/dev'
+save_path = parameters.checkpoint_dir
 
-(encoder_input, decoder_input, decoder_output) = load_preprocess("preprocess_prev2.p")
+(encoder_input, decoder_input, decoder_output) = load_preprocess(parameters.train_file)
 vocab = processing.LanguageIndex
-with open("vocab.p", mode='rb') as in_file:
+with open(parameters.vocab_file, mode='rb') as in_file:
     vocab = pickle.load(in_file)
 
 max_target_sentence_length = max([len(sentence) for sentence in decoder_input])
