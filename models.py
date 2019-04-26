@@ -17,7 +17,7 @@ import time
 
 print(tf.__version__)
 
-def process_decoder_input(target_data, language, params):
+def process_decoder_input(target_data, language, batch_size):
     """
     Preprocess target data for encoding
     :return: Preprocessed target data
@@ -25,8 +25,8 @@ def process_decoder_input(target_data, language, params):
     # get '<GO>' id
     go_id = language.word2idx['<start>']
 
-    after_slice = tf.strided_slice(target_data, [0, 0], [params.batch_size, -1], [1, 1])
-    after_concat = tf.concat([tf.fill([params.batch_size, 1], go_id), after_slice], 1)
+    after_slice = tf.strided_slice(target_data, [0, 0], [batch_size, -1], [1, 1])
+    after_concat = tf.concat([tf.fill([batch_size, 1], go_id), after_slice], 1)
 
     return after_concat
 
@@ -49,13 +49,13 @@ def encoding_layer(rnn_inputs, params, vocab_size):
 
 def decoding_layer_train(encoder_state, dec_cell, dec_embed_input,
                          target_sequence_length, max_summary_length,
-                         output_layer, params):
+                         output_layer, keep_prob):
     """
     Create a training process in decoding layer
     :return: BasicDecoderOutput containing training logits and sample_id
     """
     dec_cell = tf.contrib.rnn.DropoutWrapper(dec_cell,
-                                             output_keep_prob=params.keep_prob)
+                                             output_keep_prob=keep_prob)
 
     # for only input layer
     helper = tf.contrib.seq2seq.TrainingHelper(dec_embed_input,
@@ -74,16 +74,16 @@ def decoding_layer_train(encoder_state, dec_cell, dec_embed_input,
 
 
 def decoding_layer_infer(encoder_state, dec_cell, dec_embeddings, language, max_target_sequence_length,
-                         vocab_size, output_layer, params):
+                         vocab_size, output_layer, keep_prob, batch_size):
     """
     Create a inference process in decoding layer
     :return: BasicDecoderOutput containing inference logits and sample_id
     """
     dec_cell = tf.contrib.rnn.DropoutWrapper(dec_cell,
-                                             output_keep_prob=params.keep_prob)
+                                             output_keep_prob=keep_prob)
 
     helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(dec_embeddings,
-                                                      tf.fill([params.batch_size], language.word2idx["<start>"]),
+                                                      tf.fill([batch_size], language.word2idx["<start>"]),
                                                       language.word2idx["<end>"])
 
     decoder = tf.contrib.seq2seq.BasicDecoder(dec_cell,
@@ -128,13 +128,13 @@ def decoding_layer(dec_input, encoder_state,
                                             max_target_sequence_length,
                                             vocab_size,
                                             output_layer,
-                                            params.batch_size,
-                                            params.keep_prob)
+                                            params.keep_prob,
+                                            params.batch_size)
 
     return (train_output, infer_output)
 
 
-def seq2seq_model(input_data, target_data, params,
+def seq2seq_model(input_data, target_data, keep_prob, params,
                   target_sequence_length,
                   max_target_sentence_length,
                   vocab_size,
@@ -144,11 +144,8 @@ def seq2seq_model(input_data, target_data, params,
     :return: Tuple of (Training BasicDecoderOutput, Inference BasicDecoderOutput)
     """
     enc_outputs, enc_states = encoding_layer(input_data,
-                                             params.units,
-                                             params.num_layers,
-                                             params.keep_prob,
-                                             vocab_size,
-                                             params.embedding_dim)
+                                             params,
+                                             vocab_size)
 
     dec_input = process_decoder_input(target_data,
                                       language,
@@ -158,12 +155,8 @@ def seq2seq_model(input_data, target_data, params,
                                                 enc_states,
                                                 target_sequence_length,
                                                 max_target_sentence_length,
-                                                params.units,
-                                                params.num_layers,
+                                                params,
                                                 language,
-                                                vocab_size,
-                                                params.batch_size,
-                                                params.keep_prob,
-                                                params.embedding_dim)
+                                                vocab_size)
 
     return train_output, infer_output
