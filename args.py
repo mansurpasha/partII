@@ -17,6 +17,7 @@ def format_parser(parser):
 
     # filepath arguments
     parser.add_argument("--train_file", type=str, default='', help="Filepath to training data")
+    parser.add_argument("--length_file", type=str, default='', help="Filepath to lengths of data")
     parser.add_argument("--model_file", type=str, default=None, help="Filepath to saved model to continue training")
     parser.add_argument("--vocab_file", type=str, default=None, help="Filepath to precomputed vocab file")
     parser.add_argument("--encoder_file", type=str, default=None, help="Filepath to saved encoder model for inference")

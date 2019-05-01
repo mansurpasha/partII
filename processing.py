@@ -136,11 +136,15 @@ def create_vocab(path, num_examples, path_to_vocab):
         f.write(k + "\n")
     f.close()
 
+def generate_seq_lengths(sequences):
+    return [len(sequence) for sequence in sequences]
+
 if __name__ == "__main__":
     # generate vocab file
     '''create_vocab("/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/data/self_dialogue_corpus/processed/nples.txt",
              324401, "vocab_file")'''
     # pickle and store all preprocessed (vectorized) data and pickled vocab class
+    '''
     prev2_filepath = "/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/data/self_dialogue_corpus/processed/2ples.txt"
     prev1_filepath = "/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/data/self_dialogue_corpus/processed/nples.txt"
     vocab_file = "/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/vocab_file"
@@ -159,4 +163,36 @@ if __name__ == "__main__":
 
     pickle.dump(vocab, open('vocab.p', 'wb'))
     print("written vocab")
+    
+    # append sequence lengths to our pickles
+    with open("pickles/preprocess_prev2.p", mode='rb') as in_file:
+        p2_enc_inp, p2_dec_inp, p2_dec_out = pickle.load(in_file)
+    p2_enc_inp_lengths = generate_seq_lengths(p2_enc_inp)
+    p2_dec_inp_lengths = generate_seq_lengths(p2_dec_inp)
+    p2_dec_out_lengths = generate_seq_lengths(p2_dec_out)
+    pickle.dump((p2_enc_inp_lengths, p2_dec_inp_lengths, p2_dec_out_lengths), open('lengths_prev2.p', 'wb'))
+    with open("pickles/preprocess_forward.p", mode='rb') as in_file:
+        f_enc_inp, f_dec_inp, f_dec_out = pickle.load(in_file)
+    f_enc_inp_lengths = generate_seq_lengths(f_enc_inp)
+    f_dec_inp_lengths = generate_seq_lengths(f_dec_inp)
+    f_dec_out_lengths = generate_seq_lengths(f_dec_out)
+    pickle.dump((f_enc_inp_lengths, f_dec_inp_lengths, f_dec_out_lengths), open('lengths_forward.p', 'wb'))
+    with open("pickles/preprocess_backward.p", mode='rb') as in_file:
+        b_enc_inp, b_dec_inp, b_dec_out = pickle.load(in_file)
+    b_enc_inp_lengths = generate_seq_lengths(b_enc_inp)
+    b_dec_inp_lengths = generate_seq_lengths(b_dec_inp)
+    b_dec_out_lengths = generate_seq_lengths(b_dec_out)
+    pickle.dump((b_enc_inp_lengths, b_dec_inp_lengths, b_dec_out_lengths), open('lengths_backward.p', 'wb'))
+    print("written all lenghts")
+    '''
+    with open("pickles/lengths_prev2.p", mode='rb') as in_file:
+        enc, dec_in, dec_out = pickle.load(in_file)
+    print(dec_in == dec_out)
+    print(enc[0:30])
+    print(dec_in[0:30])
+    print(dec_out[0:30])
+
+    bins = np.bincount(dec_in)
+    for i, x in enumerate(bins):
+        print("{}: {}".format(i, x))
 

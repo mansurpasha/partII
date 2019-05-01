@@ -49,6 +49,7 @@ def load_preprocess(datafile):
 save_path = parameters.checkpoint_dir
 
 (encoder_input, decoder_input, decoder_output) = load_preprocess(parameters.train_file)
+(encoder_lengths, decoder_lengths, decoder_lengths2 = load_preprocess(parameters.length_file)
 vocab = processing.LanguageIndex
 with open(parameters.vocab_file, mode='rb') as in_file:
     vocab = pickle.load(in_file)
@@ -147,6 +148,7 @@ train_source = encoder_input[parameters.batch_size:]
 train_target = decoder_output[parameters.batch_size:]
 valid_source = encoder_input[:parameters.batch_size]
 valid_target = decoder_output[:parameters.batch_size]
+
 (valid_sources_batch, valid_targets_batch, valid_sources_lengths, valid_targets_lengths ) = next(get_batches(valid_source,
                                                                                                              valid_target,
                                                                                                              parameters.batch_size,
