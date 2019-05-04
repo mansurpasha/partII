@@ -8,7 +8,7 @@ import argparse
 
 import processing
 from processing import LanguageIndex
-from models import encoding_layer, decoding_layer, decoding_layer_infer, decoding_layer_train, seq2seq_model
+from models import seq2seq_model
 import args
 
 # Check TensorFlow Version
@@ -49,7 +49,7 @@ def load_preprocess(datafile):
 save_path = parameters.checkpoint_dir
 
 (encoder_input, decoder_input, decoder_output) = load_preprocess(parameters.train_file)
-(encoder_lengths, decoder_lengths, decoder_lengths2 = load_preprocess(parameters.length_file)
+(encoder_lengths, decoder_lengths, decoder_lengths2) = load_preprocess(parameters.length_file)
 vocab = processing.LanguageIndex
 with open(parameters.vocab_file, mode='rb') as in_file:
     vocab = pickle.load(in_file)
@@ -63,11 +63,9 @@ with train_graph.as_default():
 
     train_logits, inference_logits = seq2seq_model(tf.reverse(input_data, [-1]), # todo: find out why the data is reversed, check the tutorial pages
                                                    targets,
-                                                   keep_prob,
-                                                   parameters,
                                                    target_sequence_length,
                                                    max_target_sequence_length,
-                                                   len(vocab.word2idx),
+                                                   parameters,
                                                    vocab)
 
     training_logits = tf.identity(train_logits.rnn_output, name='logits')
@@ -173,7 +171,7 @@ with tf.Session(graph=train_graph) as sess:
 
             if batch_i % parameters.display_step == 0 and batch_i > 0:
                 batch_train_logits = sess.run(
-                    inference_logits,
+                    training_logits,
                     {input_data: source_batch,
                      target_sequence_length: targets_lengths,
                      keep_prob: 1.0})

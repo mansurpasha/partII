@@ -36,3 +36,4 @@ def format_parser(parser):
     parser.add_argument("--keep_prob", type=float, default=0.5, help="Dropout probability")
     parser.add_argument("--display_step", type=int, default=300, help="Number of steps between displaying model performance")
     parser.add_argument("--num_layers", type=int, default=1, help="Number of layers in neural network")
+    parser.add_argument("--max_target_sequence_length", type=int, default=40, help="Maximum permitted length of output sentence")

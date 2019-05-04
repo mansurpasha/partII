@@ -30,23 +30,6 @@ def process_decoder_input(target_data, language, batch_size):
 
     return after_concat
 
-def encoding_layer(rnn_inputs, params, vocab_size):
-    """
-    :return: tuple (RNN output, RNN state)
-    """
-    embed = tf.contrib.layers.embed_sequence(rnn_inputs,
-                                             vocab_size=vocab_size,
-                                             embed_dim=params.embedding_dim)
-
-    stacked_cells = tf.contrib.rnn.MultiRNNCell(
-        [tf.contrib.rnn.DropoutWrapper(tf.contrib.rnn.LSTMCell(params.units), params.keep_prob) for _ in range(params.num_layers)])
-
-    outputs, state = tf.nn.dynamic_rnn(stacked_cells,
-                                       embed,
-                                       dtype=tf.float32)
-    return outputs, state
-
-
 def decoding_layer_train(encoder_state, dec_cell, dec_embed_input,
                          target_sequence_length, max_summary_length,
                          output_layer, keep_prob):
@@ -97,66 +80,48 @@ def decoding_layer_infer(encoder_state, dec_cell, dec_embeddings, language, max_
     return outputs
 
 
-def decoding_layer(dec_input, encoder_state,
-                   target_sequence_length, max_target_sequence_length,
-                   params, language, vocab_size):
-    """
-    Create decoding layer
-    :return: Tuple of (Training BasicDecoderOutput, Inference BasicDecoderOutput)
-    """
-    vocab_size = len(language.word2idx)
-    dec_embeddings = tf.Variable(tf.random_uniform([vocab_size, params.embedding_dim]))
-    dec_embed_input = tf.nn.embedding_lookup(dec_embeddings, dec_input)
+def seq2seq_model(input, target, target_length, max_target_length, params, lang_dict):
 
-    cells = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.LSTMCell(params.units) for _ in range(params.num_layers)])
+    print(target.shape)
+
+    vocab_size = len(lang_dict.word2idx)
+    # Embedding layer
+    embedding = tf.get_variable("embeddings", [vocab_size, params.embedding_dim])
+    embedded_enc_inp = tf.nn.embedding_lookup(embedding, input)
+
+    # Construct encoder RNN
+    encoder_cell = tf.nn.rnn_cell.LSTMCell(params.units, name="encoder_lstm")
+    enc_outputs, enc_state = tf.nn.dynamic_rnn(encoder_cell,
+                                       embedded_enc_inp,
+                                       dtype=tf.float32)
+
+    # Prepare data for decoder, reuse same embedding layer
+    dec_input = process_decoder_input(target, lang_dict, params.batch_size)
+    print(dec_input.shape)
+    dec_embed_input = tf.nn.embedding_lookup(embedding, dec_input)
+    print(dec_embed_input.shape)
+
+    decoder_cell = tf.nn.rnn_cell.LSTMCell(params.units, name="decoder_lstm")
 
     with tf.variable_scope("decode"):
         output_layer = tf.layers.Dense(vocab_size)
-        train_output = decoding_layer_train(encoder_state,
-                                            cells,
+        train_output = decoding_layer_train(enc_state,
+                                            decoder_cell,
                                             dec_embed_input,
-                                            target_sequence_length,
-                                            max_target_sequence_length,
+                                            target_length,
+                                            max_target_length,
                                             output_layer,
                                             params.keep_prob)
 
     with tf.variable_scope("decode", reuse=True):
-        infer_output = decoding_layer_infer(encoder_state,
-                                            cells,
-                                            dec_embeddings,
-                                            language,
-                                            max_target_sequence_length,
+        infer_output = decoding_layer_infer(enc_state,
+                                            decoder_cell,
+                                            dec_embed_input,
+                                            lang_dict,
+                                            max_target_length,
                                             vocab_size,
                                             output_layer,
                                             params.keep_prob,
                                             params.batch_size)
-
-    return (train_output, infer_output)
-
-
-def seq2seq_model(input_data, target_data, keep_prob, params,
-                  target_sequence_length,
-                  max_target_sentence_length,
-                  vocab_size,
-                  language):
-    """
-    Build the Sequence-to-Sequence model
-    :return: Tuple of (Training BasicDecoderOutput, Inference BasicDecoderOutput)
-    """
-    enc_outputs, enc_states = encoding_layer(input_data,
-                                             params,
-                                             vocab_size)
-
-    dec_input = process_decoder_input(target_data,
-                                      language,
-                                      params.batch_size)
-
-    train_output, infer_output = decoding_layer(dec_input,
-                                                enc_states,
-                                                target_sequence_length,
-                                                max_target_sentence_length,
-                                                params,
-                                                language,
-                                                vocab_size)
 
     return train_output, infer_output
