@@ -61,12 +61,12 @@ with train_graph.as_default():
     input_data, targets, target_sequence_length, max_target_sequence_length = enc_dec_model_inputs()
     lr, keep_prob = hyperparam_inputs()
 
-    train_logits, inference_logits = seq2seq_model(tf.reverse(input_data, [-1]), # todo: find out why the data is reversed, check the tutorial pages
-                                                   targets,
-                                                   target_sequence_length,
-                                                   max_target_sequence_length,
-                                                   parameters,
-                                                   vocab)
+    train_logits, inference_logits = seq2seq_model(input=tf.reverse(input_data, [-1]), # todo: find out why the data is reversed, check the tutorial pages
+                                                   target=targets,
+                                                   target_length=target_sequence_length,
+                                                   max_target_length=max_target_sequence_length,
+                                                   params=parameters,
+                                                   lang_dict=vocab)
 
     training_logits = tf.identity(train_logits.rnn_output, name='logits')
     inference_logits = tf.identity(inference_logits.sample_id, name='predictions')

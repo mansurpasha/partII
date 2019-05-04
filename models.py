@@ -101,7 +101,7 @@ def seq2seq_model(input, target, target_length, max_target_length, params, lang_
     dec_embed_input = tf.nn.embedding_lookup(embedding, dec_input)
     print(dec_embed_input.shape)
 
-    decoder_cell = tf.nn.rnn_cell.LSTMCell(params.units, name="decoder_lstm")
+    decoder_cell = tf.nn.rnn_cell.LSTMCell(params.units)
 
     with tf.variable_scope("decode"):
         output_layer = tf.layers.Dense(vocab_size)
@@ -116,7 +116,7 @@ def seq2seq_model(input, target, target_length, max_target_length, params, lang_
     with tf.variable_scope("decode", reuse=True):
         infer_output = decoding_layer_infer(enc_state,
                                             decoder_cell,
-                                            dec_embed_input,
+                                            embedding,
                                             lang_dict,
                                             max_target_length,
                                             vocab_size,
