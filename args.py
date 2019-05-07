@@ -12,8 +12,8 @@ def format_parser(parser):
     # checkpoint filepaths, initialize models or continue training
     parser.add_argument("--checkpoint_dir", type=str, default='', help="Filepath to directory where checkpoints are stored")
     parser.add_argument("--rl_dir", type=str, default='', help="Filepath to directory where policies are stored")
-    parser.add_argument("--initialize_rl", type=str, default='n', help="If yes, policy is initialized using newest seq2seq model")
-    parser.add_argument("--continue_training", type=str, default='y', help="If no, initializes a brand new model for training")
+    parser.add_argument("--initialize_rl", type=str, default='n', help="(y/n) If yes, policy is initialized using newest seq2seq model")
+    parser.add_argument("--continue_training", type=str, default='y', help="(y/n) If no, initializes a brand new model for training")
 
     # filepath arguments
     parser.add_argument("--train_file", type=str, default='', help="Filepath to training data")
@@ -37,3 +37,8 @@ def format_parser(parser):
     parser.add_argument("--display_step", type=int, default=300, help="Number of steps between displaying model performance")
     parser.add_argument("--num_layers", type=int, default=1, help="Number of layers in neural network")
     parser.add_argument("--max_target_sequence_length", type=int, default=40, help="Maximum permitted length of output sentence")
+
+    # model variants
+    parser.add_argument("--attention", type=str, default='n', help="(y/n) If yes, adds an attention layer to the encoder")
+    parser.add_argument("--beam_decode", type=str, default='n', help="(y/n) If yes, uses a beam_search_decoder")
+    parser.add_argument("--beam_width", type=int, default=5, help="Number of candidate responses tracked by beam decoder")

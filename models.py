@@ -17,13 +17,12 @@ import time
 
 print(tf.__version__)
 
-def process_decoder_input(target_data, language, batch_size):
+def process_decoder_input(target_data, go_id, batch_size):
     """
     Preprocess target data for encoding
     :return: Preprocessed target data
     """
     # get '<GO>' id
-    go_id = language.word2idx['<start>']
 
     after_slice = tf.strided_slice(target_data, [0, 0], [batch_size, -1], [1, 1])
     after_concat = tf.concat([tf.fill([batch_size, 1], go_id), after_slice], 1)
@@ -82,8 +81,6 @@ def decoding_layer_infer(encoder_state, dec_cell, dec_embeddings, language, max_
 
 def seq2seq_model(input, target, target_length, max_target_length, params, lang_dict):
 
-    print(target.shape)
-
     vocab_size = len(lang_dict.word2idx)
     # Embedding layer
     embedding = tf.get_variable("embeddings", [vocab_size, params.embedding_dim])
@@ -97,9 +94,7 @@ def seq2seq_model(input, target, target_length, max_target_length, params, lang_
 
     # Prepare data for decoder, reuse same embedding layer
     dec_input = process_decoder_input(target, lang_dict, params.batch_size)
-    print(dec_input.shape)
     dec_embed_input = tf.nn.embedding_lookup(embedding, dec_input)
-    print(dec_embed_input.shape)
 
     decoder_cell = tf.nn.rnn_cell.LSTMCell(params.units)
 
@@ -124,4 +119,67 @@ def seq2seq_model(input, target, target_length, max_target_length, params, lang_
                                             params.keep_prob,
                                             params.batch_size)
 
+
+
     return train_output, infer_output
+
+
+
+class Seq2Seq:
+    def __init__(self, params, language, name="Seq2SeqPolicy"):
+        self.params = params
+        self.language = language
+        self.vocab_size = len(language.word2idx)
+
+        with tf.variable_scope(name):
+            # Model inputs for pretraining the Seq2Seq model
+            with tf.name_scope("inputs"):
+                self.inputs_ = tf.placeholder(tf.float32, [None], name="inputs_")
+            with tf.name_scope("S2S_train_inputs"):
+                self.targets_ = tf.placeholder(tf.float32, [None], name="targets_")
+                self.target_lengths_ = tf.placeholder(tf.float32, [None], name="target_lengths_")
+            '''
+            # Inputs required for reinforcement learning
+            with tf.name_scope("RL_inputs"):
+                # TODO: determine size of placeholders
+                self.actions_ = tf.placeholder(tf.int32, [None], name="actions_")
+                self.discounted_episode_rewards_ = tf.placeholder(tf.float32, [None, ], name="discounted_episode_rewards")
+            '''
+            # Embed inputs, embedding layer reused when decoding
+            with tf.name_scope("embedding"):
+                self.embeddings = tf.get_variable("embeddings", [self.vocab_size, self.params.embedding_dim])
+                self.embedded_enc_inp = tf.nn.embedding_lookup(self.embeddings, self.inputs_)
+            with tf.name_scope("encoding"):
+                # Construct encoder RNN
+                self.encoder_cell = tf.nn.rnn_cell.LSTMCell(params.units, name="encoder_lstm")
+                self.enc_outputs, self.enc_state = tf.nn.dynamic_rnn(self.encoder_cell,
+                                                                     self.embedded_enc_inp,
+                                                                     dtype=tf.float32)
+            with tf.name_scope("decoding"):
+                # Prepare data for decoder, reuse same embedding layer
+                self.dec_input = process_decoder_input(self.targets_, self.language.word2idx["<start>"], self.params.batch_size)
+                self.dec_embed_input = tf.nn.embedding_lookup(self.embeddings, self.dec_input)
+
+                self.decoder_cell = tf.nn.rnn_cell.LSTMCell(params.units)
+
+                with tf.variable_scope("decode"):
+                    self.output_layer = tf.layers.Dense(self.vocab_size)
+                    self.train_output = decoding_layer_train(self.enc_state,
+                                                             self.decoder_cell,
+                                                             self.dec_embed_input,
+                                                             self.target_lengths_,
+                                                             tf.math.reduce_max(self.target_lengths_),
+                                                             self.output_layer,
+                                                             self.params.keep_prob)
+
+                with tf.variable_scope("decode", reuse=True):
+                    self.infer_output = decoding_layer_infer(self.enc_state,
+                                                        self.decoder_cell,
+                                                        self.embedding,
+                                                        self.language,
+                                                        self.params.max_target_length,
+                                                        self.vocab_size,
+                                                        self.output_layer,
+                                                        self.params.keep_prob,
+                                                        self.params.batch_size)
+
