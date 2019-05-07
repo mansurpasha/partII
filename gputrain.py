@@ -7,8 +7,8 @@ import pickle
 import argparse
 
 import processing
-from processing import LanguageIndex
-from models import seq2seq_model
+from processing import LanguageIndex, load_preprocess
+import models
 import args
 
 # Check TensorFlow Version
@@ -42,10 +42,6 @@ def hyperparam_inputs():
 
     return lr_rate, keep_prob
 
-def load_preprocess(datafile):
-    with open(datafile, mode='rb') as in_file:
-        return pickle.load(in_file)
-
 save_path = parameters.checkpoint_dir
 
 (encoder_input, decoder_input, decoder_output) = load_preprocess(parameters.train_file)
@@ -53,42 +49,6 @@ save_path = parameters.checkpoint_dir
 vocab = processing.LanguageIndex
 with open(parameters.vocab_file, mode='rb') as in_file:
     vocab = pickle.load(in_file)
-
-max_target_sentence_length = max([len(sentence) for sentence in decoder_input])
-
-train_graph = tf.Graph()
-with train_graph.as_default():
-    input_data, targets, target_sequence_length, max_target_sequence_length = enc_dec_model_inputs()
-    lr, keep_prob = hyperparam_inputs()
-
-    train_logits, inference_logits = seq2seq_model(input=tf.reverse(input_data, [-1]), # todo: find out why the data is reversed, check the tutorial pages
-                                                   target=targets,
-                                                   target_length=target_sequence_length,
-                                                   max_target_length=max_target_sequence_length,
-                                                   params=parameters,
-                                                   lang_dict=vocab)
-
-    training_logits = tf.identity(train_logits.rnn_output, name='logits')
-    inference_logits = tf.identity(inference_logits.sample_id, name='predictions')
-
-    # https://www.tensorflow.org/api_docs/python/tf/sequence_mask
-    # - Returns a mask tensor representing the first N positions of each cell.
-    masks = tf.sequence_mask(target_sequence_length, max_target_sequence_length, dtype=tf.float32, name='masks')
-
-    with tf.name_scope("optimization"):
-        # Loss function - weighted softmax cross entropy
-        cost = tf.contrib.seq2seq.sequence_loss(
-            training_logits,
-            targets,
-            masks)
-
-        # Optimizer
-        optimizer = tf.train.AdamOptimizer(lr)
-
-        # Gradient Clipping
-        gradients = optimizer.compute_gradients(cost)
-        capped_gradients = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gradients if grad is not None]
-        train_op = optimizer.apply_gradients(capped_gradients)
 
 def pad_sentence_batch(sentence_batch, pad_int):
     """Pad sentences with <PAD> so that each sentence of a batch has the same length"""
@@ -151,47 +111,78 @@ valid_target = decoder_output[:parameters.batch_size]
                                                                                                              valid_target,
                                                                                                              parameters.batch_size,
                                                                                                              vocab.word2idx["<pad>"]))
-with tf.Session(graph=train_graph) as sess:
-    sess.run(tf.global_variables_initializer())
 
-    for epoch_i in range(parameters.epochs):
-        for batch_i, (source_batch, target_batch, sources_lengths, targets_lengths) in enumerate(
-                get_batches(train_source, train_target, parameters.batch_size,
-                            vocab.word2idx["<pad>"])):
+# Reset the graph
+tf.reset_default_graph()
 
-            _, loss = sess.run(
-                [train_op, cost],
-                {input_data: source_batch,
-                 targets: target_batch,
-                 lr: parameters.learning_rate,
-                 target_sequence_length: targets_lengths,
-                 keep_prob: parameters.keep_prob})
-            # todo: marked incase something's wrong, lr and keep_prob here I'm assuming came from global variables
+# Instantiate the PGNetwork
+Seq2SeqModel = models.Seq2Seq(params=parameters, language=vocab)
 
+# Initialize Session
+sess = tf.Session()
+init = tf.global_variables_initializer()
+sess.run(init)
 
-            if batch_i % parameters.display_step == 0 and batch_i > 0:
-                batch_train_logits = sess.run(
-                    training_logits,
-                    {input_data: source_batch,
-                     target_sequence_length: targets_lengths,
-                     keep_prob: 1.0})
+saver = tf.train.Saver(max_to_keep=5)
+if parameters.continue_training == 'y':
+    saver.restore(sess, save_path)
+    print("successfully loaded")
 
-                batch_valid_logits = sess.run(
-                    inference_logits,
-                    {input_data: valid_sources_batch,
-                     target_sequence_length: valid_targets_lengths,
-                     keep_prob: 1.0})
+writer = tf.summary.FileWriter(parameters.tensorboard_dir)
+writer.add_graph(sess.graph)
 
-                train_acc = get_accuracy(target_batch, batch_train_logits)
-                valid_acc = get_accuracy(valid_targets_batch, batch_valid_logits)
+## Losses
+tf.summary.scalar("Loss", Seq2SeqModel.loss)
 
-                print('Epoch {:>3} Batch {:>4}/{} - Train Accuracy: {:>6.4f}, Validation Accuracy: {:>6.4f}, Loss: {:>6.4f}'
-                      .format(epoch_i, batch_i, len(encoder_input) // parameters.batch_size, train_acc, valid_acc, loss))
+## Reward mean
+# tf.summary.scalar("Reward_mean", PGNetwork.mean_reward_ )
+
+write_op = tf.summary.merge_all()
+
+for epoch_i in range(parameters.epochs):
+    for batch_i, (source_batch, target_batch, sources_lengths, targets_lengths) in enumerate(
+            get_batches(train_source, train_target, parameters.batch_size,
+                        vocab.word2idx["<pad>"])):
+
+        _, loss = sess.run(
+            [Seq2SeqModel.train_op, Seq2SeqModel.loss],
+            {Seq2SeqModel.inputs_: source_batch,
+             Seq2SeqModel.targets_: target_batch,
+             Seq2SeqModel.target_lengths_: targets_lengths})
+
+        if batch_i % parameters.display_step == 0 and batch_i > 0:
+            batch_train_logits = sess.run(
+                Seq2SeqModel.train_output,
+                {Seq2SeqModel.inputs_: source_batch,
+                 Seq2SeqModel.targets_: target_batch,
+                 Seq2SeqModel.target_lengths_: targets_lengths})
+
+            batch_valid_logits = sess.run(
+                Seq2SeqModel.infer_output,
+                {Seq2SeqModel.inputs_: valid_sources_batch,
+                 Seq2SeqModel.target_lengths_: valid_targets_lengths})
+
+            train_acc = get_accuracy(target_batch, batch_train_logits)
+            valid_acc = get_accuracy(valid_targets_batch, batch_valid_logits)
+
+            print('Epoch {:>3} Batch {:>4}/{} - Train Accuracy: {:>6.4f}, Validation Accuracy: {:>6.4f}, Loss: {:>6.4f}'
+                  .format(epoch_i, batch_i, len(encoder_input) // parameters.batch_size, train_acc, valid_acc, loss))
+
+        # Write TF Summaries
+        summary = sess.run(write_op, feed_dict={Seq2SeqModel.inputs_: source_batch,
+                                                Seq2SeqModel.targets_: target_batch,
+                                                Seq2SeqModel.target_lengths_: targets_lengths})
+
+        # summary = sess.run(write_op, feed_dict={x: s_.reshape(len(s_),84,84,1), y:a_, d_r: d_r_, r: r_, n: n_})
+        writer.add_summary(summary, epoch_i * parameters.batch_size + batch_i)
+        writer.flush()
+
+        break
 
     # Save Model
-    saver = tf.train.Saver()
-    saver.save(sess, save_path)
+    saver.save(sess, save_path, epoch_i)
     print('Model Trained and Saved')
+
 
 
 def save_params(params):
@@ -204,6 +195,14 @@ def load_params():
         return pickle.load(in_file)
 
 # Save parameters for checkpoint
-save_params(save_path)
 
+'''
+# Optimizer
+optimizer = tf.train.AdamOptimizer(lr)
+
+# Gradient Clipping
+gradients = optimizer.compute_gradients(cost)
+capped_gradients = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gradients if grad is not None]
+train_op = optimizer.apply_gradients(capped_gradients)
+'''
 

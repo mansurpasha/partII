@@ -136,6 +136,10 @@ def create_vocab(path, num_examples, path_to_vocab):
         f.write(k + "\n")
     f.close()
 
+def load_preprocess(datafile):
+    with open(datafile, mode='rb') as in_file:
+        return pickle.load(in_file)
+
 def generate_seq_lengths(sequences):
     return [len(sequence) for sequence in sequences]
 
