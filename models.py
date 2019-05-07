@@ -138,6 +138,7 @@ class Seq2Seq:
             with tf.name_scope("S2S_train_inputs"):
                 self.targets_ = tf.placeholder(tf.float32, [None], name="targets_")
                 self.target_lengths_ = tf.placeholder(tf.float32, [None], name="target_lengths_")
+                self.max_target_length = tf.math.reduce_max(self.target_lengths_)
             '''
             # Inputs required for reinforcement learning
             with tf.name_scope("RL_inputs"):
@@ -182,4 +183,11 @@ class Seq2Seq:
                                                         self.output_layer,
                                                         self.params.keep_prob,
                                                         self.params.batch_size)
-
+            with tf.name_scope("loss"):
+                # Create masks that mimic the shapes of the original target sequences, effectively ignoring padding
+                self.masks = tf.sequence_mask(self.target_lengths_, self.max_target_length,
+                                               dtype=tf.float32, name='masks')
+                # Calculate cross_entropy loss of model output and expected output
+                self.loss = tf.contrib.seq2seq.sequence_loss(self.train_output, self.targets_, self.masks)
+            with tf.name_scope("train"):
+                self.train_op = tf.train.RMSPropOptimizer(self.params.learning_rate).minimize(self.loss)
