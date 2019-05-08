@@ -150,15 +150,15 @@ for epoch_i in range(parameters.epochs):
              Seq2SeqModel.targets_: target_batch,
              Seq2SeqModel.target_lengths_: targets_lengths})
 
-        if batch_i % parameters.display_step == 0 and batch_i > 0:
+        if True:#batch_i % parameters.display_step == 0 and batch_i > 0:
             batch_train_logits = sess.run(
-                Seq2SeqModel.train_output,
+                Seq2SeqModel.training_output[1],
                 {Seq2SeqModel.inputs_: source_batch,
                  Seq2SeqModel.targets_: target_batch,
                  Seq2SeqModel.target_lengths_: targets_lengths})
 
             batch_valid_logits = sess.run(
-                Seq2SeqModel.infer_output,
+                Seq2SeqModel.inference_output[1],
                 {Seq2SeqModel.inputs_: valid_sources_batch,
                  Seq2SeqModel.target_lengths_: valid_targets_lengths})
 

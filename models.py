@@ -108,6 +108,8 @@ def seq2seq_model(input, target, target_length, max_target_length, params, lang_
                                             output_layer,
                                             params.keep_prob)
 
+
+
     with tf.variable_scope("decode", reuse=True):
         infer_output = decoding_layer_infer(enc_state,
                                             decoder_cell,
@@ -118,6 +120,8 @@ def seq2seq_model(input, target, target_length, max_target_length, params, lang_
                                             output_layer,
                                             params.keep_prob,
                                             params.batch_size)
+
+
 
 
 
@@ -172,33 +176,41 @@ class Seq2Seq:
                 #self.dec_embed_input = reshape_embeddings(self.dec_embed_input, self.params.embedding_dim)
 
                 self.decoder_cell = tf.nn.rnn_cell.LSTMCell(params.units)
+                self.decoder_cell_w_dropout = tf.contrib.rnn.DropoutWrapper(self.decoder_cell,
+                                                                            output_keep_prob=self.params.keep_prob)
 
-                with tf.variable_scope("decode"):
-                    self.output_layer = tf.layers.Dense(self.vocab_size)
-                    self.train_output = decoding_layer_train(self.enc_state,
-                                                             self.decoder_cell,
-                                                             self.dec_embed_input,
-                                                             self.target_lengths_,
-                                                             tf.math.reduce_max(self.target_lengths_),
-                                                             self.output_layer,
-                                                             self.params.keep_prob)
+                self.output_layer = tf.layers.Dense(self.vocab_size)
 
-                with tf.variable_scope("decode", reuse=True):
-                    self.infer_output = decoding_layer_infer(self.enc_state,
-                                                        self.decoder_cell,
-                                                        self.embeddings,
-                                                        self.language,
-                                                        self.params.max_target_length,
-                                                        self.vocab_size,
-                                                        self.output_layer,
-                                                        self.params.keep_prob,
-                                                        self.params.batch_size)
+                with tf.name_scope("training"):
+                    self.helper = tf.contrib.seq2seq.TrainingHelper(self.dec_embed_input, self.target_lengths_)
+                    self.decoder = tf.contrib.seq2seq.BasicDecoder(self.decoder_cell_w_dropout,
+                                                              self.helper,
+                                                              self.enc_state,
+                                                              self.output_layer)
+
+                    # unrolling the decoder layer
+                    self.training_output, _, _ = tf.contrib.seq2seq.dynamic_decode(self.decoder,
+                                                                      impute_finished=True,
+                                                                      maximum_iterations=self.max_target_length)
+
+                with tf.variable_scope("inference"):
+                    self.helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(self.embeddings,
+                                                                           tf.fill([self.params.batch_size],
+                                                                           language.word2idx["<start>"]),
+                                                                           language.word2idx["<end>"])
+                    self.decoder = tf.contrib.seq2seq.BasicDecoder(self.decoder_cell_w_dropout,
+                                                                   self.helper,
+                                                                   self.enc_state,
+                                                                   self.output_layer)
+                    self.inference_output, _, _  = tf.contrib.seq2seq.dynamic_decode(self.decoder,
+                                                                      impute_finished=True,
+                                                                      maximum_iterations=self.max_target_length)
             with tf.name_scope("loss"):
                 # Create masks that mimic the shapes of the original target sequences, effectively ignoring padding
                 self.masks = tf.sequence_mask(self.target_lengths_, self.max_target_length,
                                                dtype=tf.float32, name='masks')
                 # Calculate cross_entropy loss of model output and expected output
                 # train_output is a tuple of (logits, argmax(logits).index), dereferenced to obtained logits
-                self.loss = tf.contrib.seq2seq.sequence_loss(self.train_output[0], self.targets_, self.masks)
-            with tf.name_scope("train"):
+                self.loss = tf.contrib.seq2seq.sequence_loss(self.training_output[0], self.targets_, self.masks)
+            with tf.name_scope("optimize"):
                 self.train_op = tf.train.RMSPropOptimizer(self.params.learning_rate).minimize(self.loss)

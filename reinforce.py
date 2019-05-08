@@ -21,6 +21,7 @@ import pickle
 from processing import load_preprocess
 from models import Seq2Seq
 import args
+import utils
 
 parser = argparse.ArgumentParser()
 args.format_parser(parser)
@@ -33,34 +34,22 @@ vocab = processing.LanguageIndex
 vocab = pickle.load(parameters.vocab_file)
 import math
 
-def calculate_probability(encoder, decoder, sentence, expected_response, lang):
-    inputs = tf.convert_to_tensor(sentence)
-    inputs = tf.expand_dims(inputs, 0)
-
-    result = ''
-
-    hidden = [tf.zeros((1, units))]
-    enc_out, enc_hidden = encoder(inputs, hidden)
-
-    dec_hidden = enc_hidden
-    dec_input = tf.expand_dims([lang.word2idx['<start>']], 0)
-
-    running_probability = 1
-
-    expected_response = sentence_to_idx_unpadded(expected_response, lang)
+def calculate_probability(model, input, expected_response, lang):
+    expected_response = utils.sentence_to_idx(expected_response, lang)
     expected_response = expected_response.tolist()
     expected_response.append(lang.word2idx["<end>"])
     expected_response = np.array(expected_response)
 
-    for word in expected_response:
-        predictions, dec_hidden, attention_weights = decoder(dec_input, dec_hidden, enc_out)
+    running_probability = 1
 
-        probability = predictions[0][word].numpy()
+    sess = tf.Session()
+    logits = sess.run(model.training_output[0], {model.inputs_: input,
+                                        model.targets_: expected_response,
+                                        model.target_lengths_: len(expected_response)})
 
+    for logit,word in zip(logits,expected_response):
+        probability = logit[word]
         running_probability *= probability
-
-        # the predicted ID is fed back into the model
-        dec_input = tf.expand_dims([word], 0)
 
     return running_probability
 
