@@ -54,30 +54,21 @@ def calculate_probability(model, input, expected_response, lang):
     return running_probability
 
 class RewardCalculator():
-    def __init__(self, encoder_2state, decoder_2state, seq2seq_encoder, seq2seq_decoder, seq2seq_back_encoder,
-                 seq2seq_back_decoder, dull_responses):
-        self.double_enc = encoder_2state
-        self.double_dec = decoder_2state
-        self.forward_enc = seq2seq_encoder
-        self.forward_dec = seq2seq_decoder
-        self.back_enc = seq2seq_back_encoder
-        self.back_dec = seq2seq_back_decoder
-
+    def __init__(self, forward, backward, prev2, dull_responses):
         self.dull_responses = dull_responses
-        self.prev2_model = Seq2Seq(name="S2S_prev2")
-        self.forward_model = Seq2Seq(name="S2S_forward")
-        self.backward_model = Seq2Seq(name="S2S_backward")
-
+        self.prev2_model = prev2
+        self.forward_model = forward
+        self.backward_model = backward
 
     # calculates the average negative log likelihood of an utterance being responded to with a dull response
     # input: utterance should be a padded max_length
     def calculate_r1(self, utterance, lang):
         cumulative_likelihood = 0
         for s in self.dull_responses:
-            cumulative_likelihood += ((1 / len(sentence_to_idx_unpadded(s, lang))) *
-                                      math.log10(calculate_probability(self.forward_enc, self.forward_dec, utterance, s,
+            cumulative_likelihood += ((1 / len(utils.sentence_to_idx(s, lang))) *
+                                      math.log10(calculate_probability(self.forward_model, utterance, s,
                                                                        lang)))
-        return -1 * (1 / len(dull_responses)) * cumulative_likelihood
+        return -1 * (1 / len(self.dull_responses)) * cumulative_likelihood
 
     # calculates the negative log of the cosine of similarity between two consecutive turns of dialogue from the policy
     # requires turns be submitted as the encoded form, i.e. the hidden state when finised encoding
@@ -87,14 +78,12 @@ class RewardCalculator():
     # calculate the log likelihood of the seq2seq generating utterance a based on the two sentence state [p,q]
     # plus the log likelihood of the backwards_seq2seq generating (q|a)
     # input: action, state_p, and state_q should all be padded max_length index sequences
-    def calculate_r3(action, state_p, state_q, lang):
-        forward_likelihood = (1 / len(action)) * math.log10(calculate_probability(self.double_enc,
-                                                                                  self.double_dec,
+    def calculate_r3(self, action, state_p, state_q, lang):
+        forward_likelihood = (1 / len(action)) * math.log10(calculate_probability(self.backward_model,
                                                                                   np.concatenate((state_p, state_q)),
                                                                                   processing.idx2sentence(action, lang),
                                                                                   lang))
-        backward_likelihood = (1 / len(state_q)) * math.log10(calculate_probability(self.back_enc,
-                                                                                    self.back_dec,
+        backward_likelihood = (1 / len(state_q)) * math.log10(calculate_probability(self.backward_model,
                                                                                     action,
                                                                                     processing.idx2sentence(state_q,
                                                                                                             lang),
@@ -253,6 +242,9 @@ def discount_and_normalize_rewards(episode_rewards):
 
     return discounted_episode_rewards
 
+  self.prev2_model = Seq2Seq(name="S2S_prev2")
+        self.forward_model = Seq2Seq(name="S2S_forward")
+        self.backward_model = Seq2Seq(name="S2S_backward")
 
 allRewards = []
 

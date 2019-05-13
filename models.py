@@ -146,7 +146,7 @@ class Seq2Seq:
             with tf.name_scope("S2S_train_inputs"):
                 self.targets_ = tf.placeholder(tf.int32, [None, None], name="targets_")
                 self.target_lengths_ = tf.placeholder(tf.int32, [None], name="target_lengths_")
-                self.max_target_length = tf.math.reduce_max(self.target_lengths_)
+                self.max_target_length_ = tf.placeholder(tf.int32, shape=(), name="target_max_length_")
             '''
             # Inputs required for reinforcement learning
             with tf.name_scope("RL_inputs"):
@@ -191,7 +191,7 @@ class Seq2Seq:
                     # unrolling the decoder layer
                     self.training_output, _, _ = tf.contrib.seq2seq.dynamic_decode(self.decoder,
                                                                       impute_finished=True,
-                                                                      maximum_iterations=self.max_target_length)
+                                                                      maximum_iterations=self.max_target_length_)
 
                 with tf.variable_scope("inference"):
                     self.helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(self.embeddings,
@@ -204,13 +204,14 @@ class Seq2Seq:
                                                                    self.output_layer)
                     self.inference_output, _, _  = tf.contrib.seq2seq.dynamic_decode(self.decoder,
                                                                       impute_finished=True,
-                                                                      maximum_iterations=self.max_target_length)
+                                                                      maximum_iterations=self.max_target_length_)
             with tf.name_scope("loss"):
                 # Create masks that mimic the shapes of the original target sequences, effectively ignoring padding
-                self.masks = tf.sequence_mask(self.target_lengths_, self.max_target_length,
+                self.masks = tf.sequence_mask(self.target_lengths_, self.max_target_length_,
                                                dtype=tf.float32, name='masks')
                 # Calculate cross_entropy loss of model output and expected output
                 # train_output is a tuple of (logits, argmax(logits).index), dereferenced to obtained logits
                 self.loss = tf.contrib.seq2seq.sequence_loss(self.training_output[0], self.targets_, self.masks)
             with tf.name_scope("optimize"):
                 self.train_op = tf.train.RMSPropOptimizer(self.params.learning_rate).minimize(self.loss)
+

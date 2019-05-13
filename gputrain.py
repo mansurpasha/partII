@@ -148,19 +148,21 @@ for epoch_i in range(parameters.epochs):
             [Seq2SeqModel.train_op, Seq2SeqModel.loss],
             {Seq2SeqModel.inputs_: source_batch,
              Seq2SeqModel.targets_: target_batch,
-             Seq2SeqModel.target_lengths_: targets_lengths})
+             Seq2SeqModel.target_lengths_: targets_lengths,
+             Seq2SeqModel.max_target_length_: max(targets_lengths)})
 
-        if True:#batch_i % parameters.display_step == 0 and batch_i > 0:
+        if batch_i % parameters.display_step == 0 and batch_i > 0:
             batch_train_logits = sess.run(
                 Seq2SeqModel.training_output[1],
                 {Seq2SeqModel.inputs_: source_batch,
                  Seq2SeqModel.targets_: target_batch,
-                 Seq2SeqModel.target_lengths_: targets_lengths})
+                 Seq2SeqModel.target_lengths_: targets_lengths,
+                 Seq2SeqModel.max_target_length_: max(targets_lengths)})
 
             batch_valid_logits = sess.run(
                 Seq2SeqModel.inference_output[1],
                 {Seq2SeqModel.inputs_: valid_sources_batch,
-                 Seq2SeqModel.target_lengths_: valid_targets_lengths})
+                 Seq2SeqModel.max_target_length_: max(targets_lengths)})
 
             train_acc = get_accuracy(target_batch, batch_train_logits)
             valid_acc = get_accuracy(valid_targets_batch, batch_valid_logits)
@@ -171,7 +173,8 @@ for epoch_i in range(parameters.epochs):
         # Write TF Summaries
         summary = sess.run(write_op, feed_dict={Seq2SeqModel.inputs_: source_batch,
                                                 Seq2SeqModel.targets_: target_batch,
-                                                Seq2SeqModel.target_lengths_: targets_lengths})
+                                                Seq2SeqModel.target_lengths_: targets_lengths,
+                                                Seq2SeqModel.max_target_length_: max(targets_lengths)})
 
         # summary = sess.run(write_op, feed_dict={x: s_.reshape(len(s_),84,84,1), y:a_, d_r: d_r_, r: r_, n: n_})
         writer.add_summary(summary, epoch_i * parameters.batch_size + batch_i)
