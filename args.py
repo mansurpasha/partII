@@ -37,10 +37,11 @@ def format_parser(parser):
     parser.add_argument("--learning_rate", type=float, default=0.001, help="Initial learning rate for optimizer")
     parser.add_argument("--keep_prob", type=float, default=0.5, help="Dropout probability")
     parser.add_argument("--display_step", type=int, default=300, help="Number of steps between displaying model performance")
-    parser.add_argument("--num_layers", type=int, default=1, help="Number of layers in neural network")
+    parser.add_argument("--num_layers", type=int, default=3, help="Number of layers in neural network")
     parser.add_argument("--max_target_length", type=int, default=40, help="Maximum permitted length of output sentence")
 
     # model variants
-    parser.add_argument("--attention", type=str, default='n', help="(y/n) If yes, adds an attention layer to the encoder")
+    parser.add_argument("--use_dropout", type=str, default='y', help="(y/n) If yes, uses Dropout when training models")
+    parser.add_argument("--use_attention", type=str, default='n', help="(y/n) If yes, adds an attention layer to the encoder")
     parser.add_argument("--beam_decode", type=str, default='n', help="(y/n) If yes, uses a beam_search_decoder")
     parser.add_argument("--beam_width", type=int, default=5, help="Number of candidate responses tracked by beam decoder")

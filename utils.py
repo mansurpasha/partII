@@ -72,6 +72,9 @@ def calculate_probability(encoder, decoder, sentence, expected_response, lang):
 
     return running_probability
 
+def find_common_responses(sentences):
+    return
+
 
 out = calculate_probability(encoder, decoder,
                             input_tensor_train[0],

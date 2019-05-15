@@ -12,7 +12,7 @@ from nltk.tokenize import word_tokenize
 def preprocess_sentence(w):
     return word_tokenize(w.lower())
 
-def create_dataset(path, num_examples):
+def create_dataset(path):
     # read datafile
     lines = open(path, encoding='UTF-8').read().strip().split('\n')
     # split datafile into lines, splits lines into sentences using separator token $$--$$,
@@ -66,9 +66,9 @@ def idx_to_sentence(sentence, lang):
 #                forward - 1 turn of input, 1 turn of output
 #                backward - 1 turn of input, 1 turn of output, reversed source and target
 # IMPORTANT: forward and backward to be used with different dataset file, namely input-target pairs, instead of triples
-def load_dataset(path, num_examples, path_to_vocab, model_type):
+def load_dataset(path, path_to_vocab, model_type):
     # creating cleaned input, output pairs
-    triples = create_dataset(path, num_examples)
+    triples = create_dataset(path)
 
     # index language using the class defined above
     vocab = [w.strip("\n") for w in open(path_to_vocab, 'r').readlines()]
@@ -103,9 +103,9 @@ def load_dataset(path, num_examples, path_to_vocab, model_type):
 
     return input_tensor, decoder_input, decoder_output, lang
 
-def create_vocab(path, num_examples, path_to_vocab):
+def create_vocab(path, path_to_vocab):
     # creating cleaned input, output pairs
-    pairs = create_dataset(path, num_examples)
+    pairs = create_dataset(path)
 
     # index language using the class defined above
     lang = [inp for inp, targ in pairs]
@@ -126,7 +126,6 @@ def create_vocab(path, num_examples, path_to_vocab):
     word2idx['<start>'] = 1
     word2idx['<end>'] = 2
     word2idx['<unk>'] = 3
-    word2idx['start_of_conversation_token'] = 4
 
     for index, word in enumerate(top_words):
         word2idx[word] = index + 4
@@ -144,30 +143,53 @@ def generate_seq_lengths(sequences):
     return [len(sequence) for sequence in sequences]
 
 if __name__ == "__main__":
-    # generate vocab file
+    # generate vocab files
     '''create_vocab("/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/data/self_dialogue_corpus/processed/nples.txt",
-             324401, "vocab_file")'''
+             "vocab_file")'''
+    create_vocab("/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/data/cornell_movie_dialogs_corpus/processed/forward.txt",
+         "vocab_file_cornell")
+
     # pickle and store all preprocessed (vectorized) data and pickled vocab class
-    '''
-    prev2_filepath = "/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/data/self_dialogue_corpus/processed/2ples.txt"
-    prev1_filepath = "/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/data/self_dialogue_corpus/processed/nples.txt"
+    prev2_filepath = "/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/data/self_dialogue_corpus/processed/prev2.txt"
+    prev1_filepath = "/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/data/self_dialogue_corpus/processed/forward.txt"
     vocab_file = "/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/vocab_file"
 
-    p2_encoder_input, p2_decoder_input, p2_decoder_output, _ = load_dataset(prev2_filepath, 324401, vocab_file, "prev2")
-    pickle.dump((p2_encoder_input, p2_decoder_input, p2_decoder_output), open('preprocess_prev2.p', 'wb'))
+
+    p2_encoder_input, p2_decoder_input, p2_decoder_output, _ = load_dataset(prev2_filepath, vocab_file, "prev2")
+    pickle.dump((p2_encoder_input, p2_decoder_input, p2_decoder_output), open('self_preprocess_prev2.p', 'wb'))
     print("written p2")
 
-    f_encoder_input, f_decoder_input, f_decoder_output, _ = load_dataset(prev1_filepath, 324401, vocab_file, "forward")
-    pickle.dump((f_encoder_input, f_decoder_input, f_decoder_output), open('preprocess_forward.p', 'wb'))
+    f_encoder_input, f_decoder_input, f_decoder_output, _ = load_dataset(prev1_filepath, vocab_file, "forward")
+    pickle.dump((f_encoder_input, f_decoder_input, f_decoder_output), open('self_preprocess_forward.p', 'wb'))
     print("written forward")
 
-    b_encoder_input, b_decoder_input, b_decoder_output, vocab = load_dataset(prev1_filepath, 324401, vocab_file, "backward")
-    pickle.dump((b_encoder_input, b_decoder_input, b_decoder_output), open('preprocess_backward.p', 'wb'))
+    b_encoder_input, b_decoder_input, b_decoder_output, vocab = load_dataset(prev1_filepath, vocab_file, "backward")
+    pickle.dump((b_encoder_input, b_decoder_input, b_decoder_output), open('self_preprocess_backward.p', 'wb'))
     print("written backward")
 
-    pickle.dump(vocab, open('vocab.p', 'wb'))
+    pickle.dump(vocab, open('self_vocab.p', 'wb'))
     print("written vocab")
-    
+
+    prev2_filepath = "/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/data/cornell_movie_dialogs_corpus/processed/prev2.txt"
+    prev1_filepath = "/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/data/cornell_movie_dialogs_corpus/processed/forward.txt"
+    vocab_file = "/Users/mansurpasha/map79/partII/Individual Project/DialogueSystem/vocab_file_cornell"
+
+    p2_encoder_input, p2_decoder_input, p2_decoder_output, _ = load_dataset(prev2_filepath, vocab_file, "prev2")
+    pickle.dump((p2_encoder_input, p2_decoder_input, p2_decoder_output), open('cornell_preprocess_prev2.p', 'wb'))
+    print("written p2")
+
+    f_encoder_input, f_decoder_input, f_decoder_output, _ = load_dataset(prev1_filepath, vocab_file, "forward")
+    pickle.dump((f_encoder_input, f_decoder_input, f_decoder_output), open('cornell_preprocess_forward.p', 'wb'))
+    print("written forward")
+
+    b_encoder_input, b_decoder_input, b_decoder_output, vocab = load_dataset(prev1_filepath, vocab_file, "backward")
+    pickle.dump((b_encoder_input, b_decoder_input, b_decoder_output), open('cornell_preprocess_backward.p', 'wb'))
+    print("written backward")
+
+    pickle.dump(vocab, open('cornell_vocab.p', 'wb'))
+    print("written vocab")
+
+    '''
     # append sequence lengths to our pickles
     with open("pickles/preprocess_prev2.p", mode='rb') as in_file:
         p2_enc_inp, p2_dec_inp, p2_dec_out = pickle.load(in_file)
@@ -188,7 +210,7 @@ if __name__ == "__main__":
     b_dec_out_lengths = generate_seq_lengths(b_dec_out)
     pickle.dump((b_enc_inp_lengths, b_dec_inp_lengths, b_dec_out_lengths), open('lengths_backward.p', 'wb'))
     print("written all lenghts")
-    '''
+    
     with open("pickles/lengths_prev2.p", mode='rb') as in_file:
         enc, dec_in, dec_out = pickle.load(in_file)
     print(dec_in == dec_out)
@@ -199,4 +221,4 @@ if __name__ == "__main__":
     bins = np.bincount(dec_in)
     for i, x in enumerate(bins):
         print("{}: {}".format(i, x))
-
+    '''

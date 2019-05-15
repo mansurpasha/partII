@@ -87,6 +87,10 @@ def seq2seq_model(input, target, target_length, max_target_length, params, lang_
     embedded_enc_inp = tf.nn.embedding_lookup(embedding, input)
 
     # Construct encoder RNN
+    stacked_cells = tf.contrib.rnn.MultiRNNCell(
+        [tf.contrib.rnn.DropoutWrapper(tf.contrib.rnn.LSTMCell(params.units), params.keep_prob) for _ in
+         range(params.num_layers)])
+
     encoder_cell = tf.nn.rnn_cell.LSTMCell(params.units, name="encoder_lstm")
     enc_outputs, enc_state = tf.nn.dynamic_rnn(encoder_cell,
                                        embedded_enc_inp,
@@ -132,6 +136,20 @@ def seq2seq_model(input, target, target_length, max_target_length, params, lang_
 def reshape_embeddings(embedded_seq, embedding_dim):
      return tf.reshape(embedded_seq, [tf.shape(embedded_seq)[0], tf.shape(embedded_seq)[1], embedding_dim])
 
+# Modifies basic LSTM cell with additional wrappers as necessary, defined by params
+def create_RNN_cell(params):
+    if params.use_dropout:
+        return tf.contrib.rnn.DropoutWrapper(tf.contrib.rnn.LSTMCell(params.units), params.keep_prob)
+    else:
+        return tf.contrib.rnn.LSTMCell(params.units)
+
+# Takes single RNN parameters and stacks them on top of each other in a MultiRNNCell if num_layers is greater than 1
+def stack_RNN_cells(params):
+     if params.num_layers > 1:
+         return tf.contrib.rnn.MultiRNNCell([create_RNN_cell(params) for _ in range(params.num_layers)])
+     else:
+         return create_RNN_cell(params)
+
 class Seq2Seq:
     def __init__(self, params, language, name="Seq2SeqPolicy"):
         self.params = params
@@ -160,11 +178,21 @@ class Seq2Seq:
                 self.embedded_enc_inp = tf.nn.embedding_lookup(self.embeddings, self.inputs_)
                 #self.embedded_enc_inp = reshape_embeddings(self.embedded_enc_inp, self.params.embedding_dim)
             with tf.name_scope("encoding"):
-                # Construct encoder RNN
-                self.encoder_cell = tf.nn.rnn_cell.LSTMCell(params.units, name="encoder_lstm")
+                # Construct encoder RNN, num_layers deep, with dropout
+                self.encoder_cell = stack_RNN_cells(params)
+                # self.encoder_cell = tf.nn.rnn_cell.LSTMCell(params.units, name="encoder_lstm")
                 self.enc_outputs, self.enc_state = tf.nn.dynamic_rnn(self.encoder_cell,
                                                                      self.embedded_enc_inp,
                                                                      dtype=tf.float32)
+            with tf.name_scope("attention"):
+                # Construct attention mechanism using outputs from encoder
+                # attention_states: [batch_size, max_time, num_units]
+                self.attention_states = tf.transpose(self.enc_outputs, [1, 0, 2])
+
+                # Create an attention mechanism
+                self.attention_mechanism = tf.contrib.seq2seq.LuongAttention(
+                    self.units, attention_states,
+                    memory_sequence_length=source_sequence_length)
             with tf.name_scope("decoding"):
                 # Prepare data for decoder, reuse same embedding layer
 
@@ -175,15 +203,15 @@ class Seq2Seq:
                 self.dec_embed_input = tf.nn.embedding_lookup(self.embeddings, self.targets_)
                 #self.dec_embed_input = reshape_embeddings(self.dec_embed_input, self.params.embedding_dim)
 
-                self.decoder_cell = tf.nn.rnn_cell.LSTMCell(params.units)
-                self.decoder_cell_w_dropout = tf.contrib.rnn.DropoutWrapper(self.decoder_cell,
-                                                                            output_keep_prob=self.params.keep_prob)
+
+                self.decoder = stack_RNN_cells(params)
+                # self.decoder_cell_w_dropout = tf.contrib.rnn.DropoutWrapper(self.decoder_cell, output_keep_prob=self.params.keep_prob)
 
                 self.output_layer = tf.layers.Dense(self.vocab_size)
 
                 with tf.name_scope("training"):
                     self.helper = tf.contrib.seq2seq.TrainingHelper(self.dec_embed_input, self.target_lengths_)
-                    self.decoder = tf.contrib.seq2seq.BasicDecoder(self.decoder_cell_w_dropout,
+                    self.decoder = tf.contrib.seq2seq.BasicDecoder(self.decoder,
                                                               self.helper,
                                                               self.enc_state,
                                                               self.output_layer)
@@ -198,7 +226,7 @@ class Seq2Seq:
                                                                            tf.fill([self.params.batch_size],
                                                                            language.word2idx["<start>"]),
                                                                            language.word2idx["<end>"])
-                    self.decoder = tf.contrib.seq2seq.BasicDecoder(self.decoder_cell_w_dropout,
+                    self.decoder = tf.contrib.seq2seq.BasicDecoder(self.decoder,
                                                                    self.helper,
                                                                    self.enc_state,
                                                                    self.output_layer)

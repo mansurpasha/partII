@@ -151,25 +151,6 @@ for epoch_i in range(parameters.epochs):
              Seq2SeqModel.target_lengths_: targets_lengths,
              Seq2SeqModel.max_target_length_: max(targets_lengths)})
 
-        if batch_i % parameters.display_step == 0 and batch_i > 0:
-            batch_train_logits = sess.run(
-                Seq2SeqModel.training_output[1],
-                {Seq2SeqModel.inputs_: source_batch,
-                 Seq2SeqModel.targets_: target_batch,
-                 Seq2SeqModel.target_lengths_: targets_lengths,
-                 Seq2SeqModel.max_target_length_: max(targets_lengths)})
-
-            batch_valid_logits = sess.run(
-                Seq2SeqModel.inference_output[1],
-                {Seq2SeqModel.inputs_: valid_sources_batch,
-                 Seq2SeqModel.max_target_length_: max(targets_lengths)})
-
-            train_acc = get_accuracy(target_batch, batch_train_logits)
-            valid_acc = get_accuracy(valid_targets_batch, batch_valid_logits)
-
-            print('Epoch {:>3} Batch {:>4}/{} - Train Accuracy: {:>6.4f}, Validation Accuracy: {:>6.4f}, Loss: {:>6.4f}'
-                  .format(epoch_i, batch_i, len(encoder_input) // parameters.batch_size, train_acc, valid_acc, loss))
-
         # Write TF Summaries
         summary = sess.run(write_op, feed_dict={Seq2SeqModel.inputs_: source_batch,
                                                 Seq2SeqModel.targets_: target_batch,
@@ -180,18 +161,30 @@ for epoch_i in range(parameters.epochs):
         writer.add_summary(summary, epoch_i * parameters.batch_size + batch_i)
         writer.flush()
 
-        break
-
     # Save Model
     saver.save(sess, save_path, epoch_i)
-    print('Model Trained and Saved')
+    # Evaluate Model
+    batch_train_logits = sess.run(
+        Seq2SeqModel.training_output[1],
+        {Seq2SeqModel.inputs_: source_batch,
+         Seq2SeqModel.targets_: target_batch,
+         Seq2SeqModel.target_lengths_: targets_lengths,
+         Seq2SeqModel.max_target_length_: max(targets_lengths)})
 
+    batch_valid_logits = sess.run(
+        Seq2SeqModel.inference_output[1],
+        {Seq2SeqModel.inputs_: valid_sources_batch,
+         Seq2SeqModel.max_target_length_: max(targets_lengths)})
 
+    train_acc = get_accuracy(target_batch, batch_train_logits)
+    valid_acc = get_accuracy(valid_targets_batch, batch_valid_logits)
+
+    print('Epoch {:>3} Batch {:>4}/{} - Train Accuracy: {:>6.4f}, Validation Accuracy: {:>6.4f}, Loss: {:>6.4f}'
+          .format(epoch_i, batch_i, len(encoder_input) // parameters.batch_size, train_acc, valid_acc, loss))
 
 def save_params(params):
     with open('params.p', 'wb') as out_file:
         pickle.dump(params, out_file)
-
 
 def load_params():
     with open('params.p', mode='rb') as in_file:
