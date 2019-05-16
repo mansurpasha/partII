@@ -184,6 +184,7 @@ class Seq2Seq:
                 self.enc_outputs, self.enc_state = tf.nn.dynamic_rnn(self.encoder_cell,
                                                                      self.embedded_enc_inp,
                                                                      dtype=tf.float32)
+            '''
             with tf.name_scope("attention"):
                 # Construct attention mechanism using outputs from encoder
                 # attention_states: [batch_size, max_time, num_units]
@@ -191,8 +192,9 @@ class Seq2Seq:
 
                 # Create an attention mechanism
                 self.attention_mechanism = tf.contrib.seq2seq.LuongAttention(
-                    self.units, attention_states,
+                    self.units, self.attention_states,
                     memory_sequence_length=source_sequence_length)
+            '''
             with tf.name_scope("decoding"):
                 # Prepare data for decoder, reuse same embedding layer
 
@@ -204,14 +206,14 @@ class Seq2Seq:
                 #self.dec_embed_input = reshape_embeddings(self.dec_embed_input, self.params.embedding_dim)
 
 
-                self.decoder = stack_RNN_cells(params)
+                self.decoder_cell = stack_RNN_cells(params)
                 # self.decoder_cell_w_dropout = tf.contrib.rnn.DropoutWrapper(self.decoder_cell, output_keep_prob=self.params.keep_prob)
 
                 self.output_layer = tf.layers.Dense(self.vocab_size)
 
                 with tf.name_scope("training"):
                     self.helper = tf.contrib.seq2seq.TrainingHelper(self.dec_embed_input, self.target_lengths_)
-                    self.decoder = tf.contrib.seq2seq.BasicDecoder(self.decoder,
+                    self.decoder = tf.contrib.seq2seq.BasicDecoder(self.decoder_cell,
                                                               self.helper,
                                                               self.enc_state,
                                                               self.output_layer)
@@ -226,7 +228,7 @@ class Seq2Seq:
                                                                            tf.fill([self.params.batch_size],
                                                                            language.word2idx["<start>"]),
                                                                            language.word2idx["<end>"])
-                    self.decoder = tf.contrib.seq2seq.BasicDecoder(self.decoder,
+                    self.decoder = tf.contrib.seq2seq.BasicDecoder(self.decoder_cell,
                                                                    self.helper,
                                                                    self.enc_state,
                                                                    self.output_layer)
