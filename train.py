@@ -103,7 +103,6 @@ def get_accuracy(target, logits):
     return np.mean(np.equal(target, logits))
 
 # Split data to training and validation sets
-# todo: there has to be a far more efficient built-in for this
 #   only thing to determine is what to mark as "target", what makes the most sense would be decoder_output surely
 train_source = encoder_input[parameters.batch_size:]
 train_target = decoder_output[parameters.batch_size:]
@@ -185,8 +184,7 @@ for epoch_i in range(parameters.epochs):
     train_acc = get_accuracy(target_batch, batch_train_logits)
     valid_acc = get_accuracy(valid_targets_batch, batch_valid_logits)
 
-    print('Epoch {:>3} Batch {:>4}/{} - Train Accuracy: {:>6.4f}, Validation Accuracy: {:>6.4f}, Loss: {:>6.4f}'
-          .format(epoch_i, batch_i, len(encoder_input) // parameters.batch_size, train_acc, valid_acc, loss))
+    print("Train acc: {}, Valid acc: {}".format(train_acc,valid_acc))
 
 def save_params(params):
     with open('params.p', 'wb') as out_file:
@@ -196,15 +194,4 @@ def load_params():
     with open('params.p', mode='rb') as in_file:
         return pickle.load(in_file)
 
-# Save parameters for checkpoint
-
-'''
-# Optimizer
-optimizer = tf.train.AdamOptimizer(lr)
-
-# Gradient Clipping
-gradients = optimizer.compute_gradients(cost)
-capped_gradients = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gradients if grad is not None]
-train_op = optimizer.apply_gradients(capped_gradients)
-'''
 
