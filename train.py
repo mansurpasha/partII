@@ -10,6 +10,8 @@ import processing
 from processing import LanguageIndex, load_preprocess
 import models
 import args
+from tensorflow.python import debug as tf_debug
+
 
 # Check TensorFlow Version
 assert LooseVersion(tf.__version__) >= LooseVersion('1.1'), 'Please use TensorFlow version 1.1 or newer'
@@ -55,6 +57,7 @@ def pad_sentence_batch(sentence_batch, pad_int):
     max_sentence = max([len(sentence) for sentence in sentence_batch])
     return tf.keras.preprocessing.sequence.pad_sequences(sentence_batch,
                                                                   maxlen=max_sentence)
+
 
 
 def get_batches(sources, targets, batch_size, pad_int):
@@ -116,10 +119,11 @@ valid_target = decoder_output[:parameters.batch_size]
 tf.reset_default_graph()
 
 # Instantiate the PGNetwork
-Seq2SeqModel = models.Seq2Seq(params=parameters, language=vocab)
+Seq2SeqModel = models.RLModel(params=parameters, language=vocab)
 
 # Initialize Session
 sess = tf.Session()
+sess = tf_debug.LocalCLIDebugWrapperSession(sess)
 init = tf.global_variables_initializer()
 sess.run(init)
 
@@ -147,6 +151,7 @@ for epoch_i in range(parameters.epochs):
         _, loss = sess.run(
             [Seq2SeqModel.train_op, Seq2SeqModel.loss],
             {Seq2SeqModel.inputs_: source_batch,
+             Seq2SeqModel.input_lengths_: sources_lengths,
              Seq2SeqModel.targets_: target_batch,
              Seq2SeqModel.target_lengths_: targets_lengths,
              Seq2SeqModel.max_target_length_: max(targets_lengths)})
@@ -167,6 +172,7 @@ for epoch_i in range(parameters.epochs):
     batch_train_logits = sess.run(
         Seq2SeqModel.training_output[1],
         {Seq2SeqModel.inputs_: source_batch,
+         Seq2SeqModel.input_lengths_: sources_lengths,
          Seq2SeqModel.targets_: target_batch,
          Seq2SeqModel.target_lengths_: targets_lengths,
          Seq2SeqModel.max_target_length_: max(targets_lengths)})

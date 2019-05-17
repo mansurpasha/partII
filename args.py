@@ -25,6 +25,9 @@ def format_parser(parser):
     parser.add_argument("--decoder_file", type=str, default=None, help="Filepath to saved decoder model for inference")
     parser.add_argument("--init_sentences", type=str, default=None, help="Filepath to saved starting sentences")
 
+    parser.add_argument("--eval_file", type=str, default=None, help="Filepath to evaluation testing file")
+    parser.add_argument("--old_scope", type=str, default=None, help="Name of variable scope of model to be evaluated")
+
     # model hyperparameters
     parser.add_argument("--model_name", type=str, default="S2S_placeholder", help="Top level variable scope of Seq2Seq model trained")
     parser.add_argument("--embedding_dim", type=int, default=128, help="Size of word embedding vectors")
@@ -43,5 +46,10 @@ def format_parser(parser):
     # model variants
     parser.add_argument("--use_dropout", type=str, default='y', help="(y/n) If yes, uses Dropout when training models")
     parser.add_argument("--use_attention", type=str, default='n', help="(y/n) If yes, adds an attention layer to the encoder")
+    parser.add_argument("--attention_state", type=int, default=5, help="Number of states in the attention mechanism")
     parser.add_argument("--beam_decode", type=str, default='n', help="(y/n) If yes, uses a beam_search_decoder")
     parser.add_argument("--beam_width", type=int, default=5, help="Number of candidate responses tracked by beam decoder")
+
+    # reinforcement learning parameters
+    parser.add_argument("--gamma", type=float, default='0.99', help="Discount coefficient when discounting batch rewards")
+

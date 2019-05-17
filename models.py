@@ -137,20 +137,22 @@ def reshape_embeddings(embedded_seq, embedding_dim):
      return tf.reshape(embedded_seq, [tf.shape(embedded_seq)[0], tf.shape(embedded_seq)[1], embedding_dim])
 
 # Modifies basic LSTM cell with additional wrappers as necessary, defined by params
-def create_RNN_cell(params):
+def create_RNN_cell(params, attention_mechanism):
+    cell = tf.contrib.rnn.LSTMCell(params.units)
     if params.use_dropout:
-        return tf.contrib.rnn.DropoutWrapper(tf.contrib.rnn.LSTMCell(params.units), params.keep_prob)
-    else:
-        return tf.contrib.rnn.LSTMCell(params.units)
+        cell = tf.contrib.rnn.DropoutWrapper(cell, params.keep_prob)
+    if (params.use_attention == 'y') and (attention_mechanism != None):
+        cell = tf.contrib.seq2seq.AttentionWrapper(cell, attention_mechanism, attention_layer_size=params.attention_state)
+    return tf.contrib.rnn.LSTMCell(params.units)
 
 # Takes single RNN parameters and stacks them on top of each other in a MultiRNNCell if num_layers is greater than 1
-def stack_RNN_cells(params):
+def stack_RNN_cells(params, attention_mechanism):
      if params.num_layers > 1:
-         return tf.contrib.rnn.MultiRNNCell([create_RNN_cell(params) for _ in range(params.num_layers)])
+         return tf.contrib.rnn.MultiRNNCell([create_RNN_cell(params, attention_mechanism) for _ in range(params.num_layers)])
      else:
-         return create_RNN_cell(params)
+         return create_RNN_cell(params, attention_mechanism)
 
-class Seq2Seq:
+class RLModel:
     def __init__(self, params, language, name="Seq2SeqPolicy"):
         self.params = params
         self.language = language
@@ -179,22 +181,22 @@ class Seq2Seq:
                 #self.embedded_enc_inp = reshape_embeddings(self.embedded_enc_inp, self.params.embedding_dim)
             with tf.name_scope("encoding"):
                 # Construct encoder RNN, num_layers deep, with dropout
-                self.encoder_cell = stack_RNN_cells(params)
+                self.encoder_cell = stack_RNN_cells(params, attention_mechanism=None)
                 # self.encoder_cell = tf.nn.rnn_cell.LSTMCell(params.units, name="encoder_lstm")
                 self.enc_outputs, self.enc_state = tf.nn.dynamic_rnn(self.encoder_cell,
                                                                      self.embedded_enc_inp,
                                                                      dtype=tf.float32)
-            '''
+
             with tf.name_scope("attention"):
                 # Construct attention mechanism using outputs from encoder
                 # attention_states: [batch_size, max_time, num_units]
                 self.attention_states = tf.transpose(self.enc_outputs, [1, 0, 2])
 
                 # Create an attention mechanism
-                self.attention_mechanism = tf.contrib.seq2seq.LuongAttention(
-                    self.units, self.attention_states,
-                    memory_sequence_length=source_sequence_length)
-            '''
+                self.attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
+                    self.params.units, self.params.attention_states,
+                    memory_sequence_length=)
+
             with tf.name_scope("decoding"):
                 # Prepare data for decoder, reuse same embedding layer
 
@@ -244,4 +246,119 @@ class Seq2Seq:
                 self.loss = tf.contrib.seq2seq.sequence_loss(self.training_output[0], self.targets_, self.masks)
             with tf.name_scope("optimize"):
                 self.train_op = tf.train.RMSPropOptimizer(self.params.learning_rate).minimize(self.loss)
+
+class RLModel:
+    def __init__(self, params, language, name="RL_Model"):
+        self.params = params
+        self.language = language
+        self.vocab_size = len(language.word2idx)
+
+        with tf.variable_scope(name):
+            # Model inputs for pretraining the Seq2Seq model
+            with tf.name_scope("inputs"):
+                # Input of size (batch_size * max_seq_len {of batch} * num_features {single word id})
+                self.inputs_ = tf.placeholder(tf.int32, [None, None], name="inputs_")
+                self.inputs_lengths_ = tf.placeholder(tf.int32, [None], name="input_lengths_")
+            with tf.name_scope("S2S_train_inputs"):
+                self.targets_ = tf.placeholder(tf.int32, [None, None], name="targets_")
+                self.target_lengths_ = tf.placeholder(tf.int32, [None], name="target_lengths_")
+                self.max_target_length_ = tf.placeholder(tf.int32, shape=(), name="target_max_length_")
+
+            # Inputs required for reinforcement learning
+            with tf.name_scope("RL_inputs"):
+                # List of actions taken from episode batches
+                self.actions_ = tf.placeholder(tf.int32, [None], name="actions_")
+                # List of discounted rewards calculated from episode batches
+                self.discounted_episode_rewards_ = tf.placeholder(tf.float32, [None, ], name="discounted_episode_rewards")
+                # Placeholder variable to allow tensorboard tracking
+                self.mean_reward_ = tf.placeholder(tf.float32, name="mean_reward")
+
+            # Embed inputs, embedding layer reused when decoding
+            with tf.name_scope("embedding"):
+                self.embeddings = tf.get_variable("embeddings", [self.vocab_size, self.params.embedding_dim])
+                self.embedded_enc_inp = tf.nn.embedding_lookup(self.embeddings, self.inputs_)
+                #self.embedded_enc_inp = reshape_embeddings(self.embedded_enc_inp, self.params.embedding_dim)
+            with tf.name_scope("encoding"):
+                # Construct encoder RNN, num_layers deep, with dropout
+                self.encoder_cell = stack_RNN_cells(params)
+                # self.encoder_cell = tf.nn.rnn_cell.LSTMCell(params.units, name="encoder_lstm")
+                self.enc_outputs, self.enc_state = tf.nn.dynamic_rnn(self.encoder_cell,
+                                                                     self.embedded_enc_inp,
+                                                                     dtype=tf.float32)
+
+            with tf.name_scope("attention"):
+                # Construct attention mechanism using outputs from encoder
+                # attention_states: [batch_size, max_time, num_units]
+                self.attention_states = tf.transpose(self.enc_outputs, [1, 0, 2])
+
+                # Create an attention mechanism
+                self.attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
+                    self.params.units, self.params.attention_states,
+                    memory_sequence_length=self.inputs_lengths_)
+
+            with tf.name_scope("decoding"):
+                # Prepare data for decoder, reuse same embedding layer
+
+                self.dec_embed_input = tf.nn.embedding_lookup(self.embeddings, self.targets_)
+
+                self.decoder_cell = stack_RNN_cells(params, self.attention_mechanism)
+
+                self.output_layer = tf.layers.Dense(self.vocab_size)
+
+                # this part of the graph is used for training batches
+                with tf.name_scope("training"):
+                    self.helper = tf.contrib.seq2seq.TrainingHelper(self.dec_embed_input, self.target_lengths_)
+                    self.decoder = tf.contrib.seq2seq.BasicDecoder(self.decoder_cell,
+                                                                   self.helper,
+                                                                   self.enc_state,
+                                                                   self.output_layer)
+
+                    # unrolling the decoder layer
+                    self.training_output, _, _ = tf.contrib.seq2seq.dynamic_decode(self.decoder,
+                                                                                   impute_finished=True,
+                                                                                   maximum_iterations=self.max_target_length_)
+
+                # use this part of the graph for inferring unseen sentences
+                with tf.variable_scope("inference"):
+                    self.helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(self.embeddings,
+                                                                           tf.fill([self.params.batch_size],
+                                                                                   language.word2idx["<start>"]),
+                                                                           language.word2idx["<end>"])
+
+                    if params.beam_search == 'n':
+                        self.decoder = tf.contrib.seq2seq.BasicDecoder(self.decoder_cell,
+                                                                       self.helper,
+                                                                       self.enc_state,
+                                                                       self.output_layer)
+                    else:
+                        # make beam width copies of the initial state to start the search
+                        self.decoder_initial_state = tf.contrib.seq2seq.tile_batch(
+                            self.enc_state, multiplier=self.params.beam_width)
+
+                        # initialize beam decoder
+                        self.decoder = tf.contrib.seq2seq.BeamDecoder(self.decoder_cell,
+                                                                      self.helper,
+                                                                      tf.fill([self.params.batch_size],
+                                                                              language.word2idx["<start>"]),
+                                                                      self.language.word2idx["<end>"],
+                                                                      self.decoder_initial_state,
+                                                                      beam_width=params.beam_width,
+                                                                      output_layer=self.output_layer,
+                                                                      length_penalty_weight=0,
+                                                                      coverage_penalty_weight=0)
+
+                    # unrolling the decoder layer
+                    self.inference_output, _, _  = tf.contrib.seq2seq.dynamic_decode(self.decoder,
+                                                                                     impute_finished=True,
+                                                                                     maximum_iterations=self.max_target_length_)
+
+            with tf.name_scope("loss"):
+                # tf.nn.softmax_cross_entropy_with_logits computes the cross entropy of the result after applying the softmax function
+                self.neg_log_prob = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.inference_output[0], labels=self.actions_)
+                self.loss = tf.reduce_mean(self.neg_log_prob * self.discounted_episode_rewards_)
+
+            with tf.name_scope("train"):
+                # call this operation to train the model using the loss value
+                self.train_op = tf.train.RMSPropOptimizer(self.params.learning_rate).minimize(self.loss)
+
 

@@ -2,8 +2,6 @@ import processing
 import models
 from nltk.tokenize import word_tokenize
 
-from __future__ import absolute_import, division, print_function
-
 import tensorflow as tf
 
 import matplotlib.pyplot as plt
@@ -41,42 +39,8 @@ def idx_to_sentence(sentence, lang):
     return output[1:]
 
 
-def calculate_probability(encoder, decoder, sentence, expected_response, lang):
-    inputs = tf.convert_to_tensor(sentence)
-    inputs = tf.expand_dims(inputs, 0)
-
-    result = ''
-
-    hidden = [tf.zeros((1, units))]
-    enc_out, enc_hidden = encoder(inputs, hidden)
-
-    dec_hidden = enc_hidden
-    dec_input = tf.expand_dims([lang.word2idx['<start>']], 0)
-
-    running_probability = 1
-
-    expected_response = sentence_to_idx_unpadded(expected_response, lang)
-    expected_response = expected_response.tolist()
-    expected_response.append(lang.word2idx["<end>"])
-    expected_response = np.array(expected_response)
-
-    for word in expected_response:
-        predictions, dec_hidden, attention_weights = decoder(dec_input, dec_hidden, enc_out)
-
-        probability = predictions[0][word].numpy()
-
-        running_probability *= probability
-
-        # the predicted ID is fed back into the model
-        dec_input = tf.expand_dims([word], 0)
-
-    return running_probability
-
-def find_common_responses(sentences):
-    return
+def load_preprocess(datafile):
+    with open(datafile, mode='rb') as in_file:
+        return pickle.load(in_file)
 
 
-out = calculate_probability(encoder, decoder,
-                            input_tensor_train[0],
-                            "I don't know",
-                            language)

@@ -8,7 +8,6 @@ import pickle
 
 from nltk.tokenize import word_tokenize
 
-
 def preprocess_sentence(w):
     return word_tokenize(w.lower())
 
@@ -189,7 +188,6 @@ if __name__ == "__main__":
     pickle.dump(vocab, open('cornell_vocab.p', 'wb'))
     print("written vocab")
 
-    '''
     # append sequence lengths to our pickles
     with open("pickles/preprocess_prev2.p", mode='rb') as in_file:
         p2_enc_inp, p2_dec_inp, p2_dec_out = pickle.load(in_file)
@@ -221,4 +219,3 @@ if __name__ == "__main__":
     bins = np.bincount(dec_in)
     for i, x in enumerate(bins):
         print("{}: {}".format(i, x))
-    '''
