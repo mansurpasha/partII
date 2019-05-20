@@ -47,7 +47,7 @@ def format_parser(parser):
     parser.add_argument("--use_dropout", type=str, default='y', help="(y/n) If yes, uses Dropout when training models")
     parser.add_argument("--use_attention", type=str, default='n', help="(y/n) If yes, adds an attention layer to the encoder")
     parser.add_argument("--attention_state", type=int, default=5, help="Number of states in the attention mechanism")
-    parser.add_argument("--beam_decode", type=str, default='n', help="(y/n) If yes, uses a beam_search_decoder")
+    parser.add_argument("--beam_search", type=str, default='n', help="(y/n) If yes, uses a beam_search_decoder")
     parser.add_argument("--beam_width", type=int, default=5, help="Number of candidate responses tracked by beam decoder")
 
     # reinforcement learning parameters

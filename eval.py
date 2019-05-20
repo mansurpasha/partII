@@ -65,7 +65,7 @@ def test_model(input_file, model, vocab):
 
 # given a model, and an input file name, run the model on the inputs,
 # then calculate the diversity and length of dialogues metrics
-def evaluate(input_file, model, vocab)
+def evaluate(input_file, model, vocab):
     outputs = (input_file, model, vocab)
     uni_diversity, bi_diversity = calculate_diversity(outputs)
     lengths = calculate_diversity(outputs)

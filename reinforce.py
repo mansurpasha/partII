@@ -208,7 +208,7 @@ RLModel = RLModel(params=parameters, name="Self_Mutual_Info", language=vocab)
 
 # Initialize Session
 sess = tf.Session()
-sess = tf_debug.LocalCLIDebugWrapperSession(sess)
+#sess = tf_debug.LocalCLIDebugWrapperSession(sess)
 init = tf.global_variables_initializer()
 sess.run(init)
 
