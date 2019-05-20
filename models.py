@@ -289,7 +289,7 @@ class RLModel:
             with tf.name_scope("inputs"):
                 # Input of size (batch_size * max_seq_len {of batch} * num_features {single word id})
                 self.inputs_ = tf.placeholder(tf.int32, [None, None], name="inputs_")
-                self.inputs_lengths_ = tf.placeholder(tf.int32, [None], name="input_lengths_")
+                self.input_lengths_ = tf.placeholder(tf.int32, [None], name="input_lengths_")
             with tf.name_scope("S2S_train_inputs"):
                 self.targets_ = tf.placeholder(tf.int32, [None, None], name="targets_")
                 self.target_lengths_ = tf.placeholder(tf.int32, [None], name="target_lengths_")
@@ -374,11 +374,21 @@ class RLModel:
                                                                                      maximum_iterations=self.max_target_length_)
 
             with tf.name_scope("loss"):
+                # Create masks that mimic the shapes of the original target sequences, effectively ignoring padding
+                self.masks = tf.sequence_mask(self.target_lengths_, self.max_target_length_,
+                                               dtype=tf.float32, name='masks')
+                # Calculate cross_entropy loss of model output and expected output
+                # train_output is a tuple of (logits, argmax(logits).index), dereferenced to obtained logits
+                self.loss = tf.contrib.seq2seq.sequence_loss(self.training_output[0], self.targets_, self.masks)
+            with tf.name_scope("optimize"):
+                self.train_op = tf.train.RMSPropOptimizer(self.params.learning_rate).minimize(self.loss)
+
+            with tf.name_scope("RL_loss"):
                 # tf.nn.softmax_cross_entropy_with_logits computes the cross entropy of the result after applying the softmax function
                 self.neg_log_prob = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.inference_output[0], labels=self.actions_)
-                self.loss = tf.reduce_mean(self.neg_log_prob * self.discounted_episode_rewards_)
+                self.RL_loss = tf.reduce_mean(self.neg_log_prob * self.discounted_episode_rewards_)
 
-            with tf.name_scope("train"):
+            with tf.name_scope("RL_train"):
                 # call this operation to train the model using the loss value
-                self.train_op = tf.train.RMSPropOptimizer(self.params.learning_rate).minimize(self.loss)
+                self.RL_train_op = tf.train.RMSPropOptimizer(self.params.learning_rate).minimize(self.loss)
 

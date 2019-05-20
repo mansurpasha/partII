@@ -122,7 +122,6 @@ Seq2SeqModel = models.RLModel(params=parameters, language=vocab)
 
 # Initialize Session
 sess = tf.Session()
-sess = tf_debug.LocalCLIDebugWrapperSession(sess)
 init = tf.global_variables_initializer()
 sess.run(init)
 
